@@ -10,6 +10,8 @@ import { addFrenzy, armorFactor, dodgeChance } from '../stats.js';
 import { next, chance, range } from '../rng.js';
 import { applyBurn } from './status.js';
 import { awardAmber } from './pickups.js';
+import { onHit, onKill } from '../hooks.js';
+import { maybeDropCrate } from '../crates.js';
 
 /**
  * Credit `dealt` damage to one of the player's weapons (end-screen "damage per weapon").
@@ -36,8 +38,11 @@ function creditWeapon(p, uid, dealt) {
  * @param {object} w world
  * @param {object} e enemy
  * @param {number} amount
- * @param {{pid?:number, crit?:boolean, kb?:number, kbAngle?:number, source?:string, noLifeSteal?:boolean, wuid?:number}} [o]
+ * @param {{pid?:number, crit?:boolean, kb?:number, kbAngle?:number, source?:string, noLifeSteal?:boolean, wuid?:number,
+ *   melee?:boolean, swing?:number, secondary?:boolean}} [o]
  *   wuid: uid of the player's weapon that dealt this (omit for abilities); credited in p.score.byWeapon.
+ *   melee/swing: set by melee weapons (Serrated Tooth, Shockwave Club react to them; swing = id of the swing).
+ *   secondary: damage made by an item effect (zap, shockwave, bleed, pulses); it never triggers on-hit item effects.
  * @returns {number} damage actually dealt
  */
 export function hitEnemy(w, e, amount, o = {}) {
@@ -74,18 +79,21 @@ export function hitEnemy(w, e, amount, o = {}) {
     const B = SPECIAL_RULES.burnOnCrit;
     applyBurn(e, Math.max(B.minDps, dmg * B.dpsPerHit) * p.specials.burnOnCrit, B.time, p.id, o.wuid);
   }
-  if (e.hp <= 0) killEnemy(w, e, p ? p.id : -1);
+  // Item hooks (crit heals and zaps, bleed, shockwave); effects made by items do not trigger them again.
+  if (p && !o.secondary) onHit(w, e, p, dmg, o);
+  if (e.hp <= 0) killEnemy(w, e, p ? p.id : -1, { dmg, wuid: o.wuid });
   return dealt;
 }
 
 /** Roll a crit for a player's hit. Returns [damage, isCrit]. */
 export function rollCrit(w, player, base, critChance = 0, critMult = BALANCE.stat.critMultDefault) {
   const ch = (critChance + player.stats.critChance) / 100;
-  if (ch > 0 && next(w.rng) < ch) return [base * critMult, true];
+  if (ch > 0 && next(w.rng) < ch) return [base * Math.max(1.1, critMult + (player.stats.critMultAdd || 0)), true]; // Lucky Strike: softer crits
   return [base, false];
 }
 
-export function killEnemy(w, e, pid = -1) {
+/** `hit` = {dmg, wuid} of the blow that killed it (Dino Dynamite blows up for a share of it). */
+export function killEnemy(w, e, pid = -1, hit = null) {
   if (e.dead) return;
   e.dead = true;
   e.hp = 0;
@@ -96,6 +104,7 @@ export function killEnemy(w, e, pid = -1) {
     p.score.kills++;
     p.mana = Math.min(p.stats.maxMana, p.mana + BALANCE.mana.perKill);
     addFrenzy(p); // Spike's Frenzy trait
+    onKill(w, e, p, hit); // Mana Leech, Dino Dynamite
     // Golden Egg: extra amber per kill while below half HP.
     const bonus = p.specials?.lowHpAmber || 0;
     if (bonus > 0 && !p.downed && p.hp < p.stats.maxHp * SPECIAL_RULES.lowHpAmber.hpFrac) {
@@ -103,10 +112,10 @@ export function killEnemy(w, e, pid = -1) {
     }
   }
   if (e.boss) w.bossDead = true;
-  dropLoot(w, e, def);
+  dropLoot(w, e, def, pid);
 }
 
-function dropLoot(w, e, def) {
+function dropLoot(w, e, def, pid = -1) {
   // Drop chance falls over the run (BALANCE.economy); nothing is lost thanks to the bag.
   // Drop chance comes from the wave table: amber income per wave is fixed however many enemies spawn.
   const dropChance = WAVES[Math.max(0, Math.min(WAVES.length, w.wave) - 1)].drop ?? 1;
@@ -130,6 +139,7 @@ function dropLoot(w, e, def) {
   } else if (chance(w.rng, e.elite || e.boss ? 1 : 0.012)) {
     spawnPickup(w, 'berry', e.x, e.y, 1);
   }
+  maybeDropCrate(w, e, def, pid); // loot crates: a small chance from anything, always from an elite
 }
 
 /**

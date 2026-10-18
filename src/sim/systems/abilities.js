@@ -1,15 +1,23 @@
 // Mana abilities (one per character, on Space). Numbers live in src/data/characters.js.
 // input.ab is a press counter: each increase is one press. A press that can't cast is dropped.
+// Spell Echo (specials.spellEcho): a cast schedules a second copy SPECIAL_RULES.spellEcho.delay s later at `strength` of the
+// ability (castEcho below). While the copy runs, `castScale` shrinks everything that scales with Ability Power; an ability can
+// also define its own `echo(w, p, ab, k)` when "half strength" needs more than that (Tail Whirl).
 
 import { CHARACTERS } from '../../data/characters.js';
 import { ENEMIES } from '../../data/enemies.js';
+import { SPECIAL_RULES } from '../../data/items.js';
 import { emit, spawnHazard } from '../entities.js';
 import { abilityCooldown, abilityCost, abilityMult } from '../stats.js';
 import { hitEnemy, healPlayer } from './damage.js';
+import { addFuse } from '../hooks.js';
+
+/** 1 normally; the Spell Echo copy runs with this < 1 (strength of the copy). */
+let castScale = 1;
 
 /** Ability damage grows with Ability Power and gently with the wave so it stays useful late. */
 export function abilityDamage(w, p, base) {
-  return base * abilityMult(p.stats) * (1 + 0.12 * Math.max(0, w.wave - 1));
+  return base * abilityMult(p.stats) * castScale * (1 + 0.12 * Math.max(0, w.wave - 1));
 }
 
 function enemiesNear(w, x, y, r) {
@@ -32,7 +40,7 @@ export function densestCluster(w, p, range, radius) {
 export const ABILITIES = {
   roar: {
     cast(w, p, ab) {
-      const m = abilityMult(p.stats);
+      const m = abilityMult(p.stats) * castScale;
       for (const e of enemiesNear(w, p.x, p.y, ab.radius)) {
         e.stun = Math.max(e.stun, ab.stun * Math.sqrt(m) * (e.boss ? 0.3 : e.elite ? 0.5 : 1));
         if (ab.damage) hitEnemy(w, e, abilityDamage(w, p, ab.damage), { pid: p.id, source: 'a' });
@@ -47,7 +55,7 @@ export const ABILITIES = {
 
   healing_pulse: {
     cast(w, p, ab) {
-      const m = abilityMult(p.stats);
+      const m = abilityMult(p.stats) * castScale;
       for (const q of w.players) {
         if (q.gone) continue;
         if ((q.x - p.x) ** 2 + (q.y - p.y) ** 2 > ab.radius * ab.radius) continue;
@@ -64,6 +72,13 @@ export const ABILITIES = {
   tail_whirl: {
     cast(w, p, ab) {
       p.abState = { id: 'tail_whirl', t: 0, next: 0, speedMult: 1.1 };
+    },
+    // Spell Echo: the copy is a train of weaker pulses around you (see hooks.js, fuse kind 'whirl').
+    echo(w, p, ab, k) {
+      addFuse(w, {
+        kind: 'whirl', t: 0, every: ab.interval, left: Math.round(ab.duration / ab.interval), pid: p.id, r: ab.radius, kb: ab.knockback,
+        dmg: (abilityDamage(w, p, ab.damage) + p.stats.meleeDamage * 0.5) * k,
+      });
     },
     tick(w, p, ab, dt) {
       const s = p.abState;
@@ -86,7 +101,7 @@ export const ABILITIES = {
     },
     cast(w, p, ab) {
       const c = densestCluster(w, p, ab.range, ab.radius);
-      const m = abilityMult(p.stats);
+      const m = abilityMult(p.stats) * castScale;
       spawnHazard(w, {
         kind: 'meteor', owner: 'player', pid: p.id, x: c.x, y: c.y, r: ab.radius * Math.min(1.5, Math.sqrt(m)),
         delay: ab.delay, dur: 0.35, dmg: abilityDamage(w, p, ab.damage),
@@ -106,6 +121,23 @@ export function tryCast(w, p) {
   p.abCd = abilityCooldown(p, ab.cooldown);
   p.score.casts++;
   impl.cast(w, p, ab);
+  emit(w, { type: 'cast', pid: p.id, ab: ab.id, x: Math.round(p.x), y: Math.round(p.y) });
+  if (p.specials?.spellEcho > 0) addFuse(w, { kind: 'echo', t: SPECIAL_RULES.spellEcho.delay, pid: p.id });
+  return true;
+}
+
+/** Spell Echo: the second, weaker copy of the player's ability (no mana, no cooldown, no score). */
+export function castEcho(w, p) {
+  const ab = CHARACTERS[p.char].ability;
+  const impl = ABILITIES[ab.id];
+  if (!impl || p.downed || p.gone) return false;
+  if (impl.canCast && !impl.canCast(w, p, ab)) return false;
+  const k = SPECIAL_RULES.spellEcho.strength;
+  if (impl.echo) impl.echo(w, p, ab, k);
+  else {
+    castScale = k;
+    try { impl.cast(w, p, ab); } finally { castScale = 1; }
+  }
   emit(w, { type: 'cast', pid: p.id, ab: ab.id, x: Math.round(p.x), y: Math.round(p.y) });
   return true;
 }

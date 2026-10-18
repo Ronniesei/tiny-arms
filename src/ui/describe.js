@@ -4,9 +4,10 @@
 //   text    the whole line as plain text (always set; tooltips and tests use it)
 //   label / value / detail   the same line split for a two-column layout (value is the bold number)
 //   good    true = green, false = red, undefined = neutral;   note: true = small muted text
+//   effect  (with note) the item's special effect: drawn brighter than other notes
 
 import { WEAPONS, CLASSES } from '../data/weapons.js';
-import { ITEMS, UPGRADES } from '../data/items.js';
+import { ITEMS, UPGRADES, TAGS } from '../data/items.js';
 import { CHARACTERS } from '../data/characters.js';
 import { PIERCE_FALLOFF } from '../sim/systems/weapons.js';
 import { STAT_LABELS, weaponDamage, weaponCooldown, weaponRange, abilityMult, classCounts } from '../sim/stats.js';
@@ -92,7 +93,7 @@ export function weaponLines(wid, tier, stats = null) {
   add(d.kind === 'melee' ? 'Reach' : 'Range', fmt(Math.round(s.range)));
 
   const crit = (d.critChance || 0) + (stats ? stats.critChance || 0 : 0);
-  if (crit > 0) add('Crit', `${fmt(crit)}% x${fmt(d.critMult || 1.5)}`);
+  if (crit > 0) add('Crit', `${fmt(crit)}% x${fmt(Math.max(1.1, (d.critMult || 1.5) + (stats ? stats.critMultAdd || 0 : 0)))}`);
 
   const pierce = (d.pierce || 0) + (tierVal(d.pierceTier, t) || 0);
   if (pierce > 0) {
@@ -166,12 +167,25 @@ const SPECIAL_TEXT = {
   nestAura: 'Downed allies near you revive faster.',
 };
 
+/** An item's tags as chips: [{id, name}] (see TAGS in data/items.js). */
+export function itemTags(id) {
+  return (ITEMS[id]?.tags || []).map((t) => ({ id: t, name: TAGS[t] || t }));
+}
+
+/**
+ * Tags the item shares with the build: [{id, name, n}] where n = how much of that tag the build already has
+ * (`owned` = ownedTags() from sim/shop.js: held items plus what the weapons are).
+ */
+export function sharedTags(id, owned = {}) {
+  return itemTags(id).filter((t) => owned[t.id] > 0).map((t) => ({ ...t, n: owned[t.id] }));
+}
+
 export function itemLines(id) {
   const it = ITEMS[id];
   if (!it) return [];
   const lines = Object.entries(it.stats || {}).map(([k, v]) => statLine(k, v));
-  if (it.desc) lines.push({ text: it.desc, note: true });
-  else for (const k of Object.keys(it.special || {})) if (SPECIAL_TEXT[k]) lines.push({ text: SPECIAL_TEXT[k], note: true });
+  if (it.desc) lines.push({ text: it.desc, note: true, effect: true });
+  else for (const k of Object.keys(it.special || {})) if (SPECIAL_TEXT[k]) lines.push({ text: SPECIAL_TEXT[k], note: true, effect: true });
   if (it.limit) lines.push({ text: `Limit ${it.limit}`, note: true });
   return lines;
 }

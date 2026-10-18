@@ -1,4 +1,5 @@
-// Between-wave screen: level-up picks first, then the 4-offer shop, plus your build (weapons, sets, items, stats).
+// Between-wave screen: loot crates first (take or recycle), then level-up picks, then the 4-offer shop, plus your build
+// (weapons, sets, items, stats). Item cards show tag chips; a chip lights up when your build already has that tag.
 // Plain HTML, re-rendered by ui.js whenever `me` (the privateView) changes. Clicks use data-act / data-* and are
 // routed to `shopActions` at the bottom. Keyboard (1-4 buy or pick, R reroll, Space/Enter ready) and the hover
 // tooltip are installed once, on the first render, and only act while the shop is on screen.
@@ -9,11 +10,11 @@ import { ITEMS } from '../data/items.js';
 import { BALANCE } from '../data/balance.js';
 import { WAVES } from '../data/waves.js';
 import { STAT_KEYS, STAT_LABELS, activeClassBonuses, classCounts } from '../sim/stats.js';
-import { weaponPrice } from '../sim/shop.js';
+import { weaponPrice, ownedTags } from '../sim/shop.js';
 import { PLAYER_COLORS_CSS } from '../render/art.js';
 import {
   TIER_NAMES, TIER_CLASS, ROMAN, esc, fmt, statLine, statValue, weaponLines, weaponStats, weaponClass, itemLines,
-  upgradeInfo, setBonusHint, classThresholds, bonusText, bonusLines,
+  upgradeInfo, setBonusHint, classThresholds, bonusText, bonusLines, itemTags, sharedTags,
 } from './describe.js';
 
 const SPR = (key) => `assets/sprites/${key}.svg`;
@@ -34,6 +35,7 @@ const tierName = (t) => TIER_NAMES[Math.max(1, Math.min(4, t)) - 1];
 const tcls = (t) => TIER_CLASS[Math.max(1, Math.min(4, t)) - 1];
 const nameOf = (o) => (o.kind === 'weapon' ? WEAPONS[o.id]?.name : ITEMS[o.id]?.name) || o.id;
 const hasLevels = (me) => !!(me.levelChoices && me.levelChoices.length);
+const hasCrates = (me) => !!(me.crates && me.crates.length);
 
 /** Refund for selling a weapon now: the same sum the sim uses (25% of the current price). */
 export function sellValue(wpn, wave) {
@@ -49,7 +51,7 @@ function countItems(items) {
 /** Lines -> <li>s. Key/value lines are laid out in two columns, notes are small and muted. */
 function linesHtml(lines) {
   return lines.map((l) => {
-    if (l.note) return `<li class="note">${esc(l.text)}</li>`;
+    if (l.note) return `<li class="note${l.effect ? ' fx' : ''}">${esc(l.text)}</li>`;
     const good = l.good === true ? 'good' : l.good === false ? 'bad' : '';
     if (l.label !== undefined && l.value !== undefined) {
       return `<li class="kv ${good} ${l.strong ? 'strong' : ''}"><span>${esc(l.label)}</span><b>${esc(l.value)}</b>${l.detail ? `<small>${esc(l.detail)}</small>` : ''}</li>`;
@@ -95,6 +97,7 @@ export function shopScreen(ui) {
     ${headerHtml(me, v, now, ui.app.session?.lobby?.().danger ?? 1)}
     <div class="shopbody">
       <main class="col main">
+        ${crateArea(me)}
         ${levelArea(me)}
         ${shopHtml(me)}
       </main>
@@ -111,6 +114,7 @@ function headerHtml(me, v, now, danger = 1) {
   const total = BALANCE.shop.time;
   const elapsed = Math.max(0, Math.min(total, total - left));
   const levels = hasLevels(me);
+  const crates = hasCrates(me);
   const next = WAVES[me.wave]; // the wave about to start (WAVES is 0-based)
   const nextTag = next?.boss ? '<em class="warn">Boss wave!</em>' : eliteTypeFor(me.wave + 1, danger) ? '<em class="warn">Elite wave!</em>' : '';
   const amberFlash = track.amberDelta && now - track.amberAt < FLASH_MS
@@ -132,8 +136,69 @@ function headerHtml(me, v, now, danger = 1) {
       ? `<div class="timer"><span>Next wave in <b data-shop-timer>${time}</b>s</span><i class="bar"><u style="animation-duration:${total}s;animation-delay:-${elapsed.toFixed(1)}s"></u></i></div>`
       : '<div class="timer"><span>Take your time</span></div>'}
     <div class="team">${mates}</div>
-    <button class="big go readybtn ${me.ready ? 'on' : ''}" data-act="shopready"${levels ? ' title="You still have a level-up to pick. It carries over if you go now."' : ''}><span>${readyLabel}</span><kbd>Space</kbd></button>
+    <button class="big go readybtn ${me.ready ? 'on' : ''}" data-act="shopready"${crates ? ' title="You still have loot crates. Going now opens them for you (you take the items)."' : levels ? ' title="You still have a level-up to pick. It carries over if you go now."' : ''}><span>${readyLabel}</span><kbd>Space</kbd></button>
   </header>`;
+}
+
+// ---- Loot crates -----------------------------------------------------------------------------------------------
+
+// Nothing below may jump under the mouse while crates are opened (review round 6: that caused misbuys). So every crate shown
+// in this shop keeps its place: once opened, its card stays, dimmed, without buttons and stamped Taken or Recycled. When the
+// last one is opened the whole area is the same height as before.
+let crateLog = { session: null, wave: -1, cards: [], how: {} };
+function crateArea(me) {
+  if (crateLog.session !== track.session || crateLog.wave !== me.wave) crateLog = { session: track.session, wave: me.wave, cards: [], how: {} };
+  if (!hasCrates(me) && !crateLog.cards.length) return '';
+  const owned = ownedTags(me);
+  const live = new Set(me.crates.map((c) => c.cid));
+  me.crates.forEach((c, i) => {
+    let e = crateLog.cards.find((x) => x.cid === c.cid);
+    if (!e) crateLog.cards.push((e = { cid: c.cid }));
+    e.html = crateCard(c, i, me, owned);
+  });
+  const cards = crateLog.cards.map((e) => (live.has(e.cid)
+    ? e.html
+    : `<div class="cdone">${e.html.replace(/data-act="[^"]*"/g, '')}<span class="stamp">${crateLog.how[e.cid] || 'Opened'}</span></div>`));
+  const n = me.crates.length;
+  return `<section class="crates${n ? '' : ' done'}">
+    <div class="sechead">
+      <h2>${n ? `Loot ${n > 1 ? 'crates' : 'crate'}!` : 'Loot crates opened'}</h2>
+      <span class="hint">${n ? `${n} to open · take the item, or recycle it for amber` : 'Level-ups and the shop are below.'}</span>
+    </div>
+    <div class="crgrid">${cards.join('')}</div>
+  </section>`;
+}
+
+function tagChips(id, owned) {
+  const tags = itemTags(id);
+  if (!tags.length) return '';
+  return `<div class="tags">${tags.map((t) => {
+    const n = owned[t.id] || 0;
+    return `<span class="tag t-${t.id}${n > 0 ? ' on' : ''}"${n > 0 ? ` title="Your build already has ${n} ${esc(t.name)}"` : ''}>${esc(t.name)}${n > 0 ? `<i>${n}</i>` : ''}</span>`;
+  }).join('')}</div>`;
+}
+
+function crateCard(c, i, me, owned) {
+  const it = ITEMS[c.id];
+  if (!it) return '';
+  const have = me.items.filter((x) => x === c.id).length;
+  const full = !!it.limit && have >= it.limit;
+  const own = have ? `<li class="note">You own ${have}${it.limit ? ` / ${it.limit}` : ''}</li>` : '';
+  const kbd = (k) => (i === 0 ? `<kbd>${k}</kbd>` : '');
+  const ids = `data-act="crate" data-idx="${i}" data-cid="${c.cid}"`;
+  return `<article class="crate ${tcls(c.tier)} ${c.elite ? 'elite' : ''}">
+    ${c.elite ? '<div class="ribbons"><span class="rb elite">Elite crate</span></div>' : ''}
+    <div class="ico"><img src="${SPR(it.icon || 'amber')}" ${IMG_ERR} alt=""><img class="boxi" src="${SPR('crate')}" ${IMG_ERR} alt=""></div>
+    <div class="cbody">
+      <div class="nm"><b>${esc(it.name)}</b><span class="tierpill">${tierName(c.tier)}</span></div>
+      ${tagChips(c.id, owned)}
+      <ul class="lines">${linesHtml(itemLines(c.id))}${own}</ul>
+    </div>
+    <div class="cbtns">
+      <button class="take ${full ? 'off' : ''}" ${ids} data-take="1"${full ? ' disabled title="You cannot hold more of this item. Recycle it instead."' : ''}>${full ? 'Limit reached' : 'Take'}${kbd(1)}</button>
+      <button class="recycle" ${ids} data-take="0" title="Sell the item back for ${c.recycle} amber (25% of its price ${c.price})">Recycle ${AMBER} +${c.recycle}${kbd(2)}</button>
+    </div>
+  </article>`;
 }
 
 // ---- Level-ups -------------------------------------------------------------------------------------------------
@@ -179,7 +244,7 @@ function levelHtml(me) {
 function shopHtml(me) {
   const cost = me.shop.rerollCost;
   const poor = me.amber < cost;
-  return `<section class="shopsec ${hasLevels(me) ? 'withlvl' : ''}">
+  return `<section class="shopsec ${hasLevels(me) || hasCrates(me) ? 'withlvl' : ''}">
     <div class="sechead">
       <h2>Shop</h2>
       <span class="hint">Buy all 4 for a free reroll · Lock keeps an offer for next wave</span>
@@ -212,6 +277,8 @@ function analyse(o, me) {
     out.have = have;
     if (limit && have >= limit) { out.blocked = true; out.ribbons.push({ cls: 'full', text: 'Limit reached' }); }
     else if (limit && have === limit - 1) out.hint = `Last one you can hold (limit ${limit}).`;
+    // Synergy: it shares a tag with at least two things in your build (items you hold, what your weapons are).
+    if (!out.blocked && sharedTags(o.id, ownedTags(me)).some((t) => t.n >= 2)) out.ribbons.push({ cls: 'syn', text: 'Synergy' });
   }
   return out;
 }
@@ -237,6 +304,7 @@ export function offerCard(o, i, me) {
       <div class="ico"><img src="${SPR(icon)}" ${IMG_ERR} alt="">${isW ? `<span class="rom">${ROMAN[o.tier - 1]}</span>` : ''}</div>
       <div class="nm"><b>${esc(nameOf(o))}</b><span class="tierpill">${tierName(o.tier)}</span><small>${esc(sub)}</small></div>
     </div>
+    ${isW ? '' : tagChips(o.id, ownedTags(me))}
     <ul class="lines">${linesHtml(lines)}${own}</ul>
     ${a.hint ? `<div class="mergenote">${esc(a.hint)}</div>` : ''}${set}
     <div class="buyrow">
@@ -312,7 +380,8 @@ function itemTile(id, n) {
   const lines = itemLines(id);
   const totals = n > 1
     ? `<div class="tt-s">All ${n} together:</div><ul class="lines">${linesHtml(Object.entries(it.stats || {}).map(([k, val]) => statLine(k, val * n)))}</ul>` : '';
-  const tip = `<div class="tt-h ${tcls(it.tier)}"><b>${esc(it.name)}</b></div><div class="tt-s">${tierName(it.tier)} item${n > 1 ? ` · you own ${n}` : ''}</div>`
+  const tagNames = itemTags(id).map((t) => t.name).join(', ');
+  const tip = `<div class="tt-h ${tcls(it.tier)}"><b>${esc(it.name)}</b></div><div class="tt-s">${tierName(it.tier)} item${n > 1 ? ` · you own ${n}` : ''}${tagNames ? ` · ${esc(tagNames)}` : ''}</div>`
     + `<ul class="lines">${linesHtml(lines)}</ul>${totals}`;
   return `<div class="item ${tcls(it.tier)}" data-tip="${esc(tip)}"><img src="${SPR(it.icon || 'amber')}" ${IMG_ERR} alt="">${n > 1 ? `<i>x${n}</i>` : ''}</div>`;
 }
@@ -340,6 +409,10 @@ export const shopActions = {
   lock: (ui, d) => ui.shopOp({ op: 'lock', slot: +d.slot }),
   reroll: (ui) => ui.shopOp({ op: 'reroll' }),
   level: (ui, d) => ui.shopOp({ op: 'level', idx: +d.idx }, 'levelup'),
+  crate: (ui, d) => {
+    crateLog.how[+d.cid] = d.take === '1' ? 'Taken' : 'Recycled';
+    return ui.shopOp({ op: 'crate', idx: +d.idx, take: d.take === '1', cid: +d.cid }, d.take === '1' ? 'buy' : undefined);
+  },
   levelReroll: (ui) => ui.shopOp({ op: 'levelReroll' }),
   sell: (ui, d) => ui.shopOp({ op: 'sell', uid: +d.uid }),
   merge: (ui, d) => ui.shopOp({ op: 'merge', uid: +d.uid }, 'buy'),
@@ -387,7 +460,13 @@ function onKeyDown(e) {
   if (digit) {
     const idx = +digit[1] - 1;
     if (!e.repeat) {
-      if (levels) { if (me.levelChoices[idx]) ui.act('level', { idx }); }
+      // Loot crates come first: 1 takes the first crate, 2 recycles it.
+      if (hasCrates(me)) {
+        const c = me.crates[0];
+        if (idx === 0) ui.act('crate', { idx: 0, take: '1', cid: c.cid });
+        else if (idx === 1) ui.act('crate', { idx: 0, take: '0', cid: c.cid });
+      }
+      else if (levels) { if (me.levelChoices[idx]) ui.act('level', { idx }); }
       else if (me.shop.offers[idx]) ui.act('buy', { slot: idx });
     }
   } else if (e.code === 'KeyR') {

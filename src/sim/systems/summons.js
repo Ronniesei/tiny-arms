@@ -3,6 +3,9 @@
 //
 // Every summon has {id, kind, pid, x, y, a (facing angle), r, wuid (uid of the owning weapon), wid}.
 // A summon dies by itself when its owner leaves or its weapon is sold / replaced.
+// Item hooks: Pack Leader's damage bonus lives in stats.js weaponDamage (summons read the same numbers as weapons);
+// Egg Clutch adds summons in weapons.js MAINTAIN; Twin Quiver fans extra turret shots here; Sharp Eye and Bouncy Pebbles
+// work through the projectile fields (pierce, falloff, bnc).
 
 import { BALANCE } from '../../data/balance.js';
 import { WEAPONS } from '../../data/weapons.js';
@@ -10,7 +13,7 @@ import { clampToArena, emit, nearestEnemy, spawnProjectile } from '../entities.j
 import { range } from '../rng.js';
 import { weaponCooldown, weaponDamage, weaponRange } from '../stats.js';
 import { hitEnemy, rollCrit } from './damage.js';
-import { PIERCE_FALLOFF } from './weapons.js';
+import { PIERCE_FALLOFF, fan } from './weapons.js';
 
 /** The weapon instance and definition a summon belongs to, or null when it no longer exists. */
 function ownerWeapon(w, s, behaviour) {
@@ -117,14 +120,18 @@ export const SUMMON_KINDS = {
       if (!target) { s.cd = 0.08; return; }
       const ang = Math.atan2(target.y - s.y, target.x - s.x);
       s.a = ang;
-      const [d, crit] = rollCrit(w, p, weaponDamage(def, wpn.tier, p.stats), def.critChance, def.critMult);
-      spawnProjectile(w, {
-        kind: def.projectile, pid: p.id, wid: def.id, wuid: s.wuid, x: s.x, y: s.y - 8,
-        vx: Math.cos(ang) * def.speed, vy: Math.sin(ang) * def.speed,
-        dmg: d, crit, pierce: (def.pierce || 0) + (p.stats.extraPierce || 0), kb: def.knockback || 0,
-        life: (reach * 1.2) / def.speed, r: def.projRadius || 7,
-        falloff: Array.isArray(def.pierceFalloff) ? def.pierceFalloff[wpn.tier - 1] : (def.pierceFalloff ?? PIERCE_FALLOFF[wpn.tier - 1]), // only matters once a shot can pierce (Sparky's Spark)
-      });
+      const base = weaponDamage(def, wpn.tier, p.stats);
+      const falloff = Math.min(1, (Array.isArray(def.pierceFalloff) ? def.pierceFalloff[wpn.tier - 1] : (def.pierceFalloff ?? PIERCE_FALLOFF[wpn.tier - 1])) + (p.stats.pierceFalloff || 0)); // only matters once a shot can pierce (Sparky's Spark, Sharp Eye)
+      for (const off of fan(p.specials?.extraShots)) { // Twin Quiver: [0] normally
+        const [d, crit] = rollCrit(w, p, base, def.critChance, def.critMult);
+        const a = ang + off;
+        spawnProjectile(w, {
+          kind: def.projectile, pid: p.id, wid: def.id, wuid: s.wuid, x: s.x, y: s.y - 8,
+          vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
+          dmg: d, crit, pierce: (def.pierce || 0) + (p.stats.extraPierce || 0), kb: def.knockback || 0,
+          life: (reach * 1.2) / def.speed, r: def.projRadius || 7, falloff,
+        });
+      }
       emit(w, { type: 'shoot', pid: p.id, slot: o.slot, a: +ang.toFixed(2), wid: def.id });
       s.cd = weaponCooldown(def, wpn.tier, p.stats);
     },

@@ -52,7 +52,7 @@ export const BALANCE = {
   },
 
   enemy: {
-    hpGrowth: 0.0,         // regular enemies' HP x (1 + hpGrowth * (wave - 1)) on top of their per-wave growth
+    hpGrowth: 0.06,         // owner (18 Oct): "it just feels easy". Regular enemies' HP x (1 + hpGrowth * (wave - 1)) on top of their per-wave growth
     cap: 360,               // live enemies (bushes excluded)
     spawnMarkTime: 0.9,     // s a spawn marker shows before the enemy appears
     spawnMinPlayerDist: 260,

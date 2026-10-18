@@ -11,7 +11,10 @@
 //   swing {pid, slot, a, r, arc, wid, thrust?}   melee; thrust:1 means a stab along a narrow line
 //   shoot {pid, slot, a, wid}                    projectile / lob / bounce shot, drone dive, turret shot
 //   beam  {pid, slot, a, x, y, x2, y2, wid}      instant line from (x, y) to (x2, y2)
-//   explode {x, y, r, pid}                       area blast (Lava Lobber, Coconut Bomb)
+//   explode {x, y, r, pid}                       area blast (Lava Lobber, Coconut Bomb, Dino Dynamite, Boom Boots)
+//
+// Item hooks (src/sim/hooks.js): melee hits pass `melee: true` and a `swing` id so Serrated Tooth and Shockwave Club can react;
+// Twin Quiver adds extra projectiles here (fan()); Egg Clutch adds summons in MAINTAIN; update() runs hooks.update (fuses, bleeds).
 
 import { BALANCE } from '../../data/balance.js';
 import { WEAPONS } from '../../data/weapons.js';
@@ -20,6 +23,8 @@ import { range } from '../rng.js';
 import { abilityMult, weaponCooldown, weaponDamage, weaponRange } from '../stats.js';
 import { hitEnemy, rollCrit } from './damage.js';
 import { pointNear } from './summons.js';
+import { SPECIAL_RULES } from '../../data/items.js';
+import { update as updateHooks } from '../hooks.js';
 
 /** Orbit position of weapon slot i of n around a player (same formula in the renderer). */
 export function slotPos(p, i, n) {
@@ -90,20 +95,48 @@ function tierVal(v, tier) {
   return Array.isArray(v) ? v[tier - 1] : v;
 }
 
+/**
+ * Twin Quiver: angle offsets (radians) for `1 + extra` projectiles fanned around the aim line, centred on it.
+ * Returns [0] when there are no extras.
+ */
+export function fan(extra) {
+  const n = 1 + Math.max(0, Math.floor(extra || 0));
+  if (n === 1) return [0];
+  const step = (SPECIAL_RULES.twinQuiver.spreadDeg * Math.PI) / 180;
+  return Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * step);
+}
+
+/** Index of the shot that stays on the aim line (the one that claims the target): the middle of the fan. */
+export const fanMain = (n) => Math.floor((n - 1) / 2);
+
+/** Mark the enemies one melee swing hits with a fresh swing id, so Shockwave Club does not shove ones already in the swing. */
+function markSwing(w, list) {
+  const id = (w.swingSerial = (w.swingSerial || 0) + 1);
+  for (const e of list) e.swing = id;
+  return id;
+}
+
 export const BEHAVIOURS = {
   swing(w, p, wpn, def, target, pos, slot) {
     const ang = Math.atan2(target.y - p.y, target.x - p.x);
     const reach = weaponRange(def, p.stats);
     const half = (def.arc * Math.PI) / 360;
     const base = weaponDamage(def, wpn.tier, p.stats);
-    const hits = w.grid.query(p.x, p.y, reach);
-    for (const e of hits) {
+    const kb = def.knockback * (1 + (p.specials?.meleeKb || 0)); // Shockwave Club
+    const struck = [];
+    for (const e of w.grid.query(p.x, p.y, reach)) {
       if (e.dead) continue;
       const ea = Math.atan2(e.y - p.y, e.x - p.x);
       const close = Math.hypot(e.x - p.x, e.y - p.y) < e.r + p.r + 10;
       if (!close && Math.abs(angleDiff(ea, ang)) > half) continue;
+      struck.push(e);
+    }
+    const swing = markSwing(w, struck);
+    for (const e of struck) {
+      if (e.dead) continue;
+      const ea = Math.atan2(e.y - p.y, e.x - p.x);
       const [d, crit] = rollCrit(w, p, base, def.critChance, def.critMult);
-      hitEnemy(w, e, d, { pid: p.id, crit, kb: def.knockback, kbAngle: ea, source: 'w', wuid: wpn.uid });
+      hitEnemy(w, e, d, { pid: p.id, crit, kb, kbAngle: ea, source: 'w', wuid: wpn.uid, melee: true, swing });
     }
     emit(w, { type: 'swing', pid: p.id, slot, a: +ang.toFixed(2), r: Math.round(reach), arc: def.arc, wid: def.id });
   },
@@ -113,9 +146,13 @@ export const BEHAVIOURS = {
     const ang = Math.atan2(target.y - p.y, target.x - p.x);
     const reach = weaponRange(def, p.stats);
     const base = weaponDamage(def, wpn.tier, p.stats);
-    for (const e of lineHits(w, p.x, p.y, ang, reach, def.width || 16)) {
+    const kb = def.knockback * (1 + (p.specials?.meleeKb || 0));
+    const struck = lineHits(w, p.x, p.y, ang, reach, def.width || 16);
+    const swing = markSwing(w, struck);
+    for (const e of struck) {
+      if (e.dead) continue;
       const [d, crit] = rollCrit(w, p, base, def.critChance, def.critMult);
-      hitEnemy(w, e, d, { pid: p.id, crit, kb: def.knockback, kbAngle: ang, source: 'w', wuid: wpn.uid });
+      hitEnemy(w, e, d, { pid: p.id, crit, kb, kbAngle: ang, source: 'w', wuid: wpn.uid, melee: true, swing });
     }
     emit(w, { type: 'swing', pid: p.id, slot, a: +ang.toFixed(2), r: Math.round(reach), arc: def.arc || 24, wid: def.id, thrust: 1 });
   },
@@ -124,21 +161,28 @@ export const BEHAVIOURS = {
   projectile(w, p, wpn, def, target, pos, slot) {
     const ang = Math.atan2(target.y - pos.y, target.x - pos.x);
     const base = weaponDamage(def, wpn.tier, p.stats);
-    const [d, crit] = rollCrit(w, p, base, def.critChance, def.critMult);
     const reach = weaponRange(def, p.stats);
-    const pr = spawnProjectile(w, {
-      kind: def.projectile, pid: p.id, wid: def.id, wuid: wpn.uid, x: pos.x, y: pos.y,
-      vx: Math.cos(ang) * def.speed, vy: Math.sin(ang) * def.speed,
-      dmg: d, crit, pierce: (def.pierce || 0) + (tierVal(def.pierceTier, wpn.tier) || 0) + (p.stats.extraPierce || 0), kb: def.knockback || 0,
-      life: (reach * 1.2) / def.speed, r: def.projRadius || 8,
-      falloff: tierVal(def.pierceFalloff || PIERCE_FALLOFF, wpn.tier),
-    });
-    // Remember in-flight damage so other weapons don't waste shots on an enemy that is already dead.
-    pr.tgt = target;
-    target.pending = (target.pending || 0) + d;
-    if (def.burn) {
-      pr.burnDps = tierVal(def.burn.dps, wpn.tier) * abilityMult(p.stats);
-      pr.burnTime = def.burn.time;
+    const offsets = fan(p.specials?.extraShots); // Twin Quiver: [0] normally
+    const main = fanMain(offsets.length);
+    for (let k = 0; k < offsets.length; k++) {
+      const [d, crit] = rollCrit(w, p, base, def.critChance, def.critMult);
+      const a = ang + offsets[k];
+      const pr = spawnProjectile(w, {
+        kind: def.projectile, pid: p.id, wid: def.id, wuid: wpn.uid, x: pos.x, y: pos.y,
+        vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
+        dmg: d, crit, pierce: (def.pierce || 0) + (tierVal(def.pierceTier, wpn.tier) || 0) + (p.stats.extraPierce || 0), kb: def.knockback || 0,
+        life: (reach * 1.2) / def.speed, r: def.projRadius || 8,
+        falloff: Math.min(1, tierVal(def.pierceFalloff || PIERCE_FALLOFF, wpn.tier) + (p.stats.pierceFalloff || 0)),
+      });
+      // Remember in-flight damage so other weapons don't waste shots on an enemy that is already dead.
+      if (k === main) {
+        pr.tgt = target;
+        target.pending = (target.pending || 0) + d;
+      }
+      if (def.burn) {
+        pr.burnDps = tierVal(def.burn.dps, wpn.tier) * abilityMult(p.stats);
+        pr.burnTime = def.burn.time;
+      }
     }
     emit(w, { type: 'shoot', pid: p.id, slot, a: +ang.toFixed(2), wid: def.id });
   },
@@ -214,15 +258,17 @@ function ownedSummons(w, pid, wuid, kind) {
 /** Per-frame upkeep for summon weapons: (w, player, weapon, def, slotIndex) => void. Needs no target. */
 export const MAINTAIN = {
   drone(w, p, wpn, def, slot) {
-    if (ownedSummons(w, p.id, wpn.uid, 'ptero') > 0) return;
+    const want = 1 + (p.specials?.clutch || 0); // Egg Clutch: +1 pterodactyl per copy
+    const have = ownedSummons(w, p.id, wpn.uid, 'ptero');
+    if (have >= want) return;
     spawnSummon(w, {
       kind: 'ptero', pid: p.id, wuid: wpn.uid, wid: def.id, x: p.x, y: p.y - 40, a: 0, r: 12,
-      st: 'orbit', ang: range(w.rng, 0, Math.PI * 2), cd: 0.4, hitIds: [],
+      st: 'orbit', ang: range(w.rng, 0, Math.PI * 2), cd: 0.4 + 0.35 * have, hitIds: [],
     });
   },
 
   turret(w, p, wpn, def, slot) {
-    const want = tierVal(def.count, wpn.tier) || 1;
+    const want = (tierVal(def.count, wpn.tier) || 1) + (p.specials?.clutch || 0); // Egg Clutch: +1 turret per copy
     const have = ownedSummons(w, p.id, wpn.uid, 'turret');
     if (have >= want) return;
     const q = pointNear(w, p.x, p.y);
@@ -233,6 +279,7 @@ export const MAINTAIN = {
 };
 
 export function update(w, dt) {
+  updateHooks(w, dt); // item fuses (bombs, echoes) and bleeds
   for (const p of w.players) {
     if (p.gone || p.downed) continue;
     const n = p.weapons.length;

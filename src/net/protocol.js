@@ -6,7 +6,7 @@
 //     players:  [{id, name, char, x, y, r, hp, maxHp, mana, maxMana, facing, moving, downed, gone,
 //                 reviveP, flash, iframes, casting, amber, level, spd, weapons:[{wid,tier}], lastSeq, abCd, abCost, rolling, rollCd}],
 //     enemies:  [{id, type, x, y, r, hpP, facing, flash, stun, burn, elite, boss, tele}],
-//     projectiles: [{id, kind, x, y, a}], shots: [{id, x, y}], pickups: [{id, kind, x, y}],
+//     projectiles: [{id, kind, x, y, a}], shots: [{id, x, y}], pickups: [{id, kind:'amber'|'berry'|'crate', x, y, gold?}],
 //     hazards:  [{id, kind, x, y, r, p, owner, cur}], summons: [{id, kind, pid, x, y, a}], marks: [{x, y, p, type}] }
 
 import { ENEMIES, ENEMY_IDS } from '../data/enemies.js';
@@ -61,7 +61,8 @@ export function encodeSnap(w) {
   const s = [];
   for (const sh of w.shots) if (!sh.dead) s.push(sh.id, r1(sh.x), r1(sh.y), r1(sh.r));
   const a = [];
-  for (const pk of w.pickups) if (!pk.dead) a.push(pk.id, pk.kind === 'berry' ? 1 : 0, r1(pk.x), r1(pk.y));
+  // kind code: 0 amber, 1 berry, 2 crate, 3 golden crate (from an elite)
+  for (const pk of w.pickups) if (!pk.dead) a.push(pk.id, pk.kind === 'berry' ? 1 : pk.kind === 'crate' ? (pk.v >= 2 ? 3 : 2) : 0, r1(pk.x), r1(pk.y));
   const h = [];
   for (const hz of w.hazards) {
     if (hz.dead) continue;
@@ -111,7 +112,12 @@ export function decodeSnap(sn, names = {}) {
   const shots = [];
   for (let i = 0; i < sn.s.length; i += 4) shots.push({ id: sn.s[i], x: sn.s[i + 1], y: sn.s[i + 2], r: sn.s[i + 3] });
   const pickups = [];
-  for (let i = 0; i < sn.a.length; i += 4) pickups.push({ id: sn.a[i], kind: sn.a[i + 1] ? 'berry' : 'amber', x: sn.a[i + 2], y: sn.a[i + 3] });
+  for (let i = 0; i < sn.a.length; i += 4) {
+    const code = sn.a[i + 1];
+    const pk = { id: sn.a[i], kind: code === 1 ? 'berry' : code >= 2 ? 'crate' : 'amber', x: sn.a[i + 2], y: sn.a[i + 3] };
+    if (code === 3) pk.gold = true;
+    pickups.push(pk);
+  }
   const hazards = sn.h.map((q) => ({ id: q[0], kind: q[1], x: q[2], y: q[3], r: q[4], p: q[5] / 100, owner: q[6] ? 'enemy' : 'player', cur: q[7] }));
   const summons = sn.u.map((q) => ({ id: q[0], kind: q[1], pid: q[2], x: q[3], y: q[4], a: q[5] / 100 }));
   const marks = [];
@@ -165,6 +171,8 @@ export function privateView(w, pid) {
     amber: p.amber, xp: p.xp, xpNext: BALANCE.xpToLevel(p.level), level: p.level, pendingLevels: p.pendingLevels,
     levelChoices: p.levelChoices, stats: { ...p.stats }, hp: p.hp,
     weapons: p.weapons.map((x) => ({ uid: x.uid, wid: x.wid, tier: x.tier })), items: p.items.slice(),
+    // Loot crates waiting to be taken or recycled: [{cid, id, tier, price, recycle, elite}] (ops {op:'crate', idx, take, cid}).
+    crates: (p.crateOffers || []).map((o) => ({ ...o })),
     shop: p.shop ? { offers: p.shop.offers.map((o) => (o ? { ...o } : null)), rerolls: p.shop.rerolls, rerollCost: rerollCost(w, p), levelRerollCost: levelRerollCost(w, p) } : null,
     ready: p.ready,
     team: w.players.filter((q) => !q.gone).map((q) => ({ id: q.id, name: q.name, char: q.char, ready: q.ready, level: q.level })),

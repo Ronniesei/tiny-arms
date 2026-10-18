@@ -9,6 +9,7 @@ import { SpatialHash } from './spatial.js';
 import { createPlayer, emit } from './entities.js';
 import { recomputeStats } from './stats.js';
 import { openShop, autoLoadout } from './shop.js';
+import { collectLeftovers, openCrates, autoResolveAll } from './crates.js';
 import { payHarvest } from './systems/pickups.js';
 import { scoreboard } from './score.js';
 import * as movement from './systems/movement.js';
@@ -89,6 +90,7 @@ export function startWave(w, n) {
 
 export function endWave(w) {
   emit(w, { type: 'waveEnd', wave: w.wave });
+  collectLeftovers(w); // loot crates still on the ground go to the nearest player
   // Uncollected amber goes into the bag and is paid out over the next wave.
   for (const pk of w.pickups) if (pk.kind === 'amber' && !pk.dead) w.bag += pk.v;
   w.pickups = [];
@@ -97,6 +99,7 @@ export function endWave(w) {
   if (w.wave >= BALANCE.waves.count) { endRun(w, true); return; }
   w.phase = 'shop';
   w.shopTime = BALANCE.shop.time;
+  openCrates(w); // every crate picked up this wave becomes an offer at the top of that player's shop
   for (const p of w.players) if (!p.gone) openShop(w, p);
 }
 
@@ -160,6 +163,7 @@ function stepShop(w, dt) {
   // Everyone else is ready: don't keep them waiting for the full timer.
   if (present.length > 1 && present.filter((p) => !p.ready).length === 1) w.shopTime = Math.min(w.shopTime, BALANCE.coop.lastReadyShopTime);
   if (w.shopTime <= 0 || (present.length > 0 && present.every((p) => p.ready))) {
+    autoResolveAll(w); // crates nobody opened are taken, so the timer never costs a free item
     startWave(w, w.wave + 1);
   }
 }

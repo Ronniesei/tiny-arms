@@ -9,16 +9,21 @@
 //  - rarity by wave and Luck (TIER_ODDS); price = floor(base + wave + base x 0.1 x wave).
 //  - reroll = floor(0.75 x wave) + step x (presses so far + 1), step = max(1, floor(0.4 x wave)); resets every wave.
 //  - locked offers survive rerolls and the next wave at their old price; buying all 4 offers rerolls for free.
+//  - build snowball (tags): 25% of item offers (SHOP_RULES.tagLeanChance) are drawn from items sharing a tag with your
+//    build (the tags of the items you hold, plus what your weapons are: melee, ranged, summon, explosive).
 //  - sell a weapon for 25% of its current price; two identical weapons of one tier merge up one tier;
 //    buying a duplicate with all slots full merges it automatically.
+//  - loot crates (crates.js): the crate offers waiting at the top of the shop are settled with {op:'crate'}; Ready takes
+//    the ones still unopened.
 
 import { BALANCE } from '../data/balance.js';
 import { WEAPONS, WEAPON_IDS } from '../data/weapons.js';
 import { ENEMIES } from '../data/enemies.js';
 import { WAVES } from '../data/waves.js';
 import { ITEMS, ITEM_IDS, TIER_ODDS, SHOP_RULES } from '../data/items.js';
-import { recomputeStats } from './stats.js';
-import { next, pick, chance, shuffle, int } from './rng.js';
+import { recomputeStats, refreshHoard } from './stats.js';
+import { next, pick, chance, shuffle, int, weighted } from './rng.js';
+import { crateOp, autoResolve } from './crates.js';
 import { chooseLevel, rollLevelChoices, rerollLevelChoices } from './levelup.js';
 import { grantXp, payHarvest } from './systems/pickups.js';
 import { botShopOp } from './bot.js';
@@ -105,9 +110,36 @@ export function rerollCost(w, p) {
 
 // ---- Offers ----
 
-function atItemLimit(p, id) {
+/** Is the player at the copy limit of an item? `pending` (item ids) counts as already held. */
+export function atItemLimit(p, id, pending = null) {
   const lim = ITEMS[id].limit;
-  return lim ? p.items.filter((x) => x === id).length >= lim : false;
+  if (!lim) return false;
+  let n = 0;
+  for (const x of p.items) if (x === id) n++;
+  if (pending) for (const x of pending) if (x === id) n++;
+  return n >= lim;
+}
+
+/** What a weapon is about, as item tags: melee or ranged, plus summon (drones, turrets) and explosive (lobbers, bombs). */
+export function weaponTags(wid) {
+  const d = WEAPONS[wid];
+  if (!d) return [];
+  const t = [d.kind === 'melee' ? 'melee' : 'ranged'];
+  if (d.behaviour === 'drone' || d.behaviour === 'turret') t.push('summon');
+  if (d.behaviour === 'lob' || d.behaviour === 'bounce') t.push('explosive');
+  return t;
+}
+
+/**
+ * The build's tags with a weight each: one per held item having the tag, one per weapon of that kind.
+ * Works on a world player or a private view (both have `items` and `weapons`).
+ * @returns {Object<string, number>}
+ */
+export function ownedTags(p) {
+  const n = {};
+  for (const id of p.items || []) for (const t of ITEMS[id]?.tags || []) n[t] = (n[t] || 0) + 1;
+  for (const wpn of p.weapons || []) for (const t of weaponTags(wpn.wid)) n[t] = (n[t] || 0) + 1;
+  return n;
 }
 
 /**
@@ -135,19 +167,44 @@ export function rollWeaponOffer(w, p, offers = [], opts = {}) {
 
 /**
  * One item offer: roll a rarity, take an item of that rarity (or the next lower one with stock).
- * 35% of the time (LEAN_CHANCE) only items that raise one of the hero's leaned stats are considered; if none
- * is in stock the roll falls back to the whole pool, so an offer always comes out.
+ * Two independent leans decide which items are considered (each falls back to the whole pool when nothing is in stock,
+ * so an offer always comes out):
+ *  - 35% of the time (LEAN_CHANCE) only items that raise one of the hero's leaned stats;
+ *  - 25% of the time (SHOP_RULES.tagLeanChance) only items sharing a tag with your build (ownedTags), the tag picked at
+ *    random weighted by how much of it you own. When both apply, items that satisfy both come first.
+ * `opts.rolls` rolls the rarity several times and keeps the best (elite crates); `opts.pending` = item ids that count as held
+ * for the copy limits (defaults to the player's unopened crate offers).
  */
-export function rollItemOffer(w, p, offers = []) {
+export function rollItemOffer(w, p, offers = [], opts = {}) {
   const taken = new Set(offers.filter((o) => o && o.kind === 'item').map((o) => o.id));
-  const start = rollTier(w, w.wave, p.stats.luck);
+  const pend = opts.pending || (p.crateOffers && p.crateOffers.length ? p.crateOffers.map((o) => o.id) : null);
+  let start = rollTier(w, w.wave, p.stats.luck);
+  for (let r = 1; r < (opts.rolls || 1); r++) start = Math.max(start, rollTier(w, w.wave, p.stats.luck));
   const lean = HERO_LEAN[p.char];
   const leaning = !!lean && chance(w.rng, LEAN_CHANCE);
-  for (const onlyLean of leaning ? [true, false] : [false]) {
-    for (const avoidTaken of [true, false]) {
-      for (let tier = start; tier >= 1; tier--) {
-        const pool = ITEM_IDS.filter((id) => ITEMS[id].tier === tier && !atItemLimit(p, id) && !(avoidTaken && taken.has(id))
-          && (!onlyLean || raisesAny(id, lean)));
+  let tag = null;
+  if (chance(w.rng, SHOP_RULES.tagLeanChance)) {
+    const have = Object.entries(ownedTags(p));
+    if (have.length) tag = weighted(w.rng, have);
+  }
+  const passes = [];
+  if (tag && leaning) passes.push({ lean: true, tag });
+  if (tag) passes.push({ tag });
+  if (leaning) passes.push({ lean: true });
+  passes.push({});
+  // A tag pass may also step UP to a rarity that is already unlocked at this wave (a small tag pool rarely has an item of
+  // exactly the rolled rarity), so the lean really shows up. Plain passes only ever step down, as before.
+  const odds = tierOdds(w.wave, p.stats.luck);
+  let top = 1;
+  for (let t = 2; t <= 4; t++) if (odds[t - 1] > 0) top = t;
+  for (const avoidTaken of [true, false]) { // a different item beats a leaned duplicate
+    for (const pass of passes) {
+      const order = [];
+      for (let t = start; t >= 1; t--) order.push(t);
+      if (pass.tag) for (let t = start + 1; t <= top; t++) order.push(t);
+      for (const tier of order) {
+        const pool = ITEM_IDS.filter((id) => ITEMS[id].tier === tier && !atItemLimit(p, id, pend) && !(avoidTaken && taken.has(id))
+          && (!pass.lean || raisesAny(id, lean)) && (!pass.tag || ITEMS[id].tags?.includes(pass.tag)));
         if (pool.length) {
           const id = pick(w.rng, pool);
           return { kind: 'item', id, tier, price: itemPrice(id, w.wave), locked: false };
@@ -231,12 +288,18 @@ function mergeInto(p, wid, tier) {
 /**
  * Apply a shop op for player pid. Ops:
  *  {op:'buy', slot} {op:'reroll'} {op:'lock', slot} {op:'sell', uid} {op:'merge', uid}
- *  {op:'level', idx} {op:'levelReroll'} {op:'ready', value?}
+ *  {op:'level', idx} {op:'levelReroll'} {op:'crate', idx, take:true|false, cid?} {op:'ready', value?}
  * @returns {{ok:boolean, msg?:string}}
  */
 export function applyShopOp(w, pid, op) {
   const p = w.players[pid];
   if (!p || p.gone || w.phase !== 'shop' || !op || !p.shop) return { ok: false, msg: 'Not in shop' };
+  const res = runShopOp(w, p, op);
+  refreshHoard(p); // Hoard Heart's damage follows the amber held
+  return res;
+}
+
+function runShopOp(w, p, op) {
   switch (op.op) {
     case 'buy': {
       const o = p.shop.offers[op.slot];
@@ -294,8 +357,11 @@ export function applyShopOp(w, pid, op) {
       return chooseLevel(w, p, op.idx);
     case 'levelReroll':
       return rerollLevelChoices(w, p);
+    case 'crate':
+      return crateOp(w, p, op);
     case 'ready':
       p.ready = op.value === undefined ? !p.ready : !!op.value;
+      if (p.ready) autoResolve(w, p); // crates left unopened are taken (or recycled if the item can't be held any more)
       return { ok: true };
     default:
       return { ok: false, msg: 'Unknown op' };

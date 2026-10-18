@@ -196,6 +196,8 @@ function itemScore(me, id) {
     s += Math.sign(v) * wgt * (v < 0 ? 1.4 : 1);
   }
   if (it.special) s += 2;
+  if (it.special?.halfHp) s -= 8;      // Glass Jaw halves max HP (not in its stats)
+  if (it.special?.berserkAs) s -= 1;   // only pays off at low HP
   return s;
 }
 

@@ -17,7 +17,13 @@ export const STAT_LABELS = {
 };
 
 /** Special item effects, summed over held items into player.specials (see ITEMS[*].special). */
-export const SPECIAL_KEYS = ['burnOnCrit', 'lowHpAmber', 'herdBond', 'manaDiscount', 'amberBonus', 'nestAura'];
+export const SPECIAL_KEYS = [
+  'burnOnCrit', 'lowHpAmber', 'herdBond', 'manaDiscount', 'amberBonus', 'nestAura',
+  // build-maker items (see the header of src/data/items.js and src/sim/hooks.js)
+  'killBoom', 'rollBomb', 'blastSize', 'blastDmg', 'extraShots', 'rangedMult', 'bounceHit', 'pierce', 'pierceFalloff',
+  'clutch', 'summonDmg', 'ownDmg', 'critHeal', 'chainZap', 'critMult', 'waveAmber', 'hoard', 'vacuum', 'spellEcho',
+  'killMana', 'shockwave', 'meleeKb', 'bleed', 'halfHp', 'berserkAs',
+];
 
 export function aggregateSpecials(items) {
   const sp = {};
@@ -81,8 +87,22 @@ export function resetFrenzy(player) {
   if (player.stats) player.stats.frenzyAs = 0;
 }
 
+/** Hoard Heart: +pct% damage per `per` amber held (max `max`%). Dynamic, so it is refreshed whenever amber changes. */
+export function hoardBonus(player) {
+  const h = player.specials?.hoard || 0;
+  if (!(h > 0)) return 0;
+  const R = SPECIAL_RULES.hoard;
+  return Math.min(R.max, Math.floor((player.amber || 0) / R.per) * R.pct * h);
+}
+
+/** Update stats.hoardDmg after amber changed (cheap; call from anything that adds or spends amber). */
+export function refreshHoard(player) {
+  if (player.stats) player.stats.hoardDmg = hoardBonus(player);
+}
+
 export function recomputeStats(player) {
   const s = { ...BALANCE.baseStats };
+  const sp = aggregateSpecials(player.items);
   const c = CHARACTERS[player.char];
   addStats(s, c.stats);
   for (const id of player.items) addStats(s, ITEMS[id]?.stats);
@@ -93,16 +113,25 @@ export function recomputeStats(player) {
   const t = c.trait;
   if (t?.armorEvery) s.armor += Math.floor(player.level / t.armorEvery) * (t.armorPer ?? 1);
   for (const k in c.mult) s[k] *= c.mult[k];
+  if (sp.halfHp > 0) s.maxHp *= 0.5 ** sp.halfHp; // Glass Jaw
   s.maxHp = Math.max(1, Math.round(s.maxHp));
   s.maxMana = Math.max(10, Math.round(s.maxMana));
   // Hero trait numbers the systems read (see `trait` in src/data/characters.js).
   s.meleeMult = t?.meleeDmg ?? 1;
   s.rangedMult = t?.rangedDmg ?? 1;
-  s.extraPierce = t?.extraPierce ?? 0;
+  s.extraPierce = (t?.extraPierce ?? 0) + sp.pierce;       // Sparky's Spark + Sharp Eye
+  s.pierceFalloff = sp.pierceFalloff;                       // Sharp Eye: pierced hits keep this much more damage
   s.frenzyAs = frenzyBonus(t, player.frenzy);
+  // Item damage multipliers the weapons read (weaponDamage): Twin Quiver, Pack Leader, Lucky Strike.
+  s.rangedItemMult = Math.max(SPECIAL_RULES.twinQuiver.minMult, 1 + sp.rangedMult);
+  s.summonMult = 1 + sp.summonDmg;
+  s.ownMult = Math.max(0.1, 1 + sp.ownDmg);
+  s.critMultAdd = sp.critMult;
+  s.berserkAs = 0;                                          // movement.js sets this every tick (Berserker Sap)
   const prevMax = player.stats.maxHp;
   player.stats = s;
-  player.specials = aggregateSpecials(player.items);
+  player.specials = sp;
+  s.hoardDmg = hoardBonus(player);
   // Gaining max HP also heals that amount; losing it clamps.
   if (prevMax !== undefined && s.maxHp > prevMax && !player.downed) player.hp += s.maxHp - prevMax;
   player.hp = Math.min(player.hp, s.maxHp);
@@ -140,15 +169,16 @@ export function weaponRange(def, stats) {
 }
 
 export function weaponCooldown(def, tier, stats) {
-  const as = Math.max(BALANCE.stat.minAttackSpeed, stats.attackSpeed + (stats.frenzyAs || 0));
+  const as = Math.max(BALANCE.stat.minAttackSpeed, stats.attackSpeed + (stats.frenzyAs || 0) + (stats.berserkAs || 0));
   return def.cooldown[tier - 1] / (1 + as / 100);
 }
 
 export function weaponDamage(def, tier, stats) {
   let d = def.dmg[tier - 1];
   if (def.scaling) for (const k in def.scaling) d += def.scaling[k] * (stats[k] || 0);
-  d *= 1 + stats.damage / 100;
-  d *= def.kind === 'melee' ? (stats.meleeMult ?? 1) : (stats.rangedMult ?? 1); // Brutus's Thick Skull
+  d *= 1 + (stats.damage + (stats.hoardDmg || 0)) / 100;
+  d *= def.kind === 'melee' ? (stats.meleeMult ?? 1) : (stats.rangedMult ?? 1) * (stats.rangedItemMult ?? 1); // Brutus's Thick Skull, Twin Quiver
+  d *= def.behaviour === 'drone' || def.behaviour === 'turret' ? (stats.summonMult ?? 1) : (stats.ownMult ?? 1); // Pack Leader
   return Math.max(1, d);
 }
 

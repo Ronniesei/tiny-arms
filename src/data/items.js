@@ -1,54 +1,116 @@
 // Shop items, level-up upgrades and the numbers behind special item effects.
 // tier: 1 common (white), 2 uncommon (blue), 3 rare (purple), 4 legendary (red).
 // stats: flat stat changes while held (most items trade one stat up for another down).
-// special: numeric effect keys, summed over held items into player.specials by stats.js
-//   (burnOnCrit, lowHpAmber, herdBond, manaDiscount, amberBonus, nestAura). Tuning: SPECIAL_RULES below.
+// special: numeric effect keys, summed over held items into player.specials by stats.js (SPECIAL_KEYS there lists
+//   them all). The first six (burnOnCrit ... nestAura) are small perks; the "build-maker" items at the bottom change
+//   HOW you play (explosions, extra shots, bouncing, summons, crit procs, economy, mana, melee procs, curses). The
+//   code that runs them is src/sim/hooks.js (on hit / kill / crit / roll / cast / wave end) plus a few lines in
+//   stats, weapons, projectiles, summons, pickups and movement. Tuning numbers: SPECIAL_RULES below.
+// tags: what the item is about (TAGS below). The shop leans toward tags you already own (SHOP_RULES.tagLeanChance),
+//   so a build snowballs.
 // limit: max copies a player can hold (the shop stops offering it). price: base price before wave inflation.
 // Icons are assets/sprites/i_<id>.svg.
 
 export const ITEMS = {
   // ---- Tier 1 (common) ----
-  sharp_tooth:  { id: 'sharp_tooth',  name: 'Sharp Tooth',  tier: 1, price: 14, icon: 'i_sharp_tooth',  stats: { damage: 8 } },
-  thick_hide:   { id: 'thick_hide',   name: 'Thick Hide',   tier: 1, price: 14, icon: 'i_thick_hide',   stats: { armor: 2, speed: -5 } },
-  big_heart:    { id: 'big_heart',    name: 'Big Heart',    tier: 1, price: 14, icon: 'i_big_heart',    stats: { maxHp: 5 } },
-  fast_feet:    { id: 'fast_feet',    name: 'Fast Feet',    tier: 1, price: 14, icon: 'i_fast_feet',    stats: { speed: 8, armor: -1 }, limit: 6 },
-  fern_snack:   { id: 'fern_snack',   name: 'Fern Snack',   tier: 1, price: 13, icon: 'i_fern_snack',   stats: { hpRegen: 3 } },
-  shiny_pebble: { id: 'shiny_pebble', name: 'Shiny Pebble', tier: 1, price: 12, icon: 'i_shiny_pebble', stats: { luck: 12 } },
-  bone_charm:   { id: 'bone_charm',   name: 'Bone Charm',   tier: 1, price: 15, icon: 'i_bone_charm',   stats: { meleeDamage: 2 } },
-  feather:      { id: 'feather',      name: 'Feather',      tier: 1, price: 15, icon: 'i_feather',      stats: { rangedDamage: 2, maxHp: -3 } },
-  egg_shell:    { id: 'egg_shell',    name: 'Egg Shell',    tier: 1, price: 13, icon: 'i_egg_shell',    stats: { dodge: 8, armor: -1 }, limit: 5 },
-  mud_bath:     { id: 'mud_bath',     name: 'Mud Bath',     tier: 1, price: 13, icon: 'i_mud_bath',     stats: { armor: 3, dodge: -5 } },
-  glow_moss:    { id: 'glow_moss',    name: 'Glow Moss',    tier: 1, price: 12, icon: 'i_glow_moss',    stats: { manaRegen: 1.5 } },
-  amber_nugget: { id: 'amber_nugget', name: 'Amber Nugget', tier: 1, price: 15, icon: 'i_amber_nugget', stats: { harvesting: 6 } },
+  sharp_tooth:  { id: 'sharp_tooth',  name: 'Sharp Tooth',  tier: 1, price: 14, icon: 'i_sharp_tooth', tags: ['damage'],  stats: { damage: 8 } },
+  thick_hide:   { id: 'thick_hide',   name: 'Thick Hide',   tier: 1, price: 14, icon: 'i_thick_hide', tags: ['defense'],   stats: { armor: 2, speed: -5 } },
+  big_heart:    { id: 'big_heart',    name: 'Big Heart',    tier: 1, price: 14, icon: 'i_big_heart', tags: ['defense'],    stats: { maxHp: 5 } },
+  fast_feet:    { id: 'fast_feet',    name: 'Fast Feet',    tier: 1, price: 14, icon: 'i_fast_feet', tags: ['speed'],    stats: { speed: 8, armor: -1 }, limit: 6 },
+  fern_snack:   { id: 'fern_snack',   name: 'Fern Snack',   tier: 1, price: 13, icon: 'i_fern_snack', tags: ['sustain'],   stats: { hpRegen: 3 } },
+  shiny_pebble: { id: 'shiny_pebble', name: 'Shiny Pebble', tier: 1, price: 12, icon: 'i_shiny_pebble', tags: ['luck'], stats: { luck: 12 } },
+  bone_charm:   { id: 'bone_charm',   name: 'Bone Charm',   tier: 1, price: 15, icon: 'i_bone_charm', tags: ['melee'],   stats: { meleeDamage: 2 } },
+  feather:      { id: 'feather',      name: 'Feather',      tier: 1, price: 15, icon: 'i_feather', tags: ['ranged'],      stats: { rangedDamage: 2, maxHp: -3 } },
+  egg_shell:    { id: 'egg_shell',    name: 'Egg Shell',    tier: 1, price: 13, icon: 'i_egg_shell', tags: ['defense'],    stats: { dodge: 8, armor: -1 }, limit: 5 },
+  mud_bath:     { id: 'mud_bath',     name: 'Mud Bath',     tier: 1, price: 13, icon: 'i_mud_bath', tags: ['defense'],     stats: { armor: 3, dodge: -5 } },
+  glow_moss:    { id: 'glow_moss',    name: 'Glow Moss',    tier: 1, price: 12, icon: 'i_glow_moss', tags: ['mana'],    stats: { manaRegen: 1.5 } },
+  amber_nugget: { id: 'amber_nugget', name: 'Amber Nugget', tier: 1, price: 15, icon: 'i_amber_nugget', tags: ['greed'], stats: { harvesting: 6 } },
 
   // ---- Tier 2 (uncommon) ----
-  war_paint:     { id: 'war_paint',     name: 'War Paint',     tier: 2, price: 32, icon: 'i_war_paint',     stats: { damage: 12, critChance: 6, armor: -2 } },
-  turtle_shell:  { id: 'turtle_shell',  name: 'Turtle Shell',  tier: 2, price: 30, icon: 'i_turtle_shell',  stats: { armor: 5, speed: -10 } },
-  long_neck:     { id: 'long_neck',     name: 'Long Neck',     tier: 2, price: 28, icon: 'i_long_neck',     stats: { range: 25, attackSpeed: -10 } },
-  raptor_claw:   { id: 'raptor_claw',   name: 'Raptor Claw',   tier: 2, price: 34, icon: 'i_raptor_claw',   stats: { critChance: 8, attackSpeed: 12, maxHp: -4 } },
-  magnet_rock:   { id: 'magnet_rock',   name: 'Magnet Rock',   tier: 2, price: 28, icon: 'i_magnet_rock',   stats: { pickupRange: 40, harvesting: 5 }, limit: 4 },
-  mana_crystal:  { id: 'mana_crystal',  name: 'Mana Crystal',  tier: 2, price: 30, icon: 'i_mana_crystal',  stats: { maxMana: 40, abilityPower: 15 } },
-  vampire_bat:   { id: 'vampire_bat',   name: 'Vampire Bat',   tier: 2, price: 36, icon: 'i_vampire_bat',   stats: { lifeSteal: 4, hpRegen: -2 }, limit: 4 },
-  coffee_bean:   { id: 'coffee_bean',   name: 'Coffee Bean',   tier: 2, price: 32, icon: 'i_coffee_bean',   stats: { attackSpeed: 18, hpRegen: -3 } },
-  volcano_ash:   { id: 'volcano_ash',   name: 'Volcano Ash',   tier: 2, price: 34, icon: 'i_volcano_ash',   stats: { critChance: 5 }, special: { burnOnCrit: 1 }, limit: 1, desc: 'Your crits set enemies on fire.' },
+  war_paint:     { id: 'war_paint',     name: 'War Paint',     tier: 2, price: 32, icon: 'i_war_paint', tags: ['damage', 'crit'],     stats: { damage: 12, critChance: 6, armor: -2 } },
+  turtle_shell:  { id: 'turtle_shell',  name: 'Turtle Shell',  tier: 2, price: 30, icon: 'i_turtle_shell', tags: ['defense'],  stats: { armor: 5, speed: -10 } },
+  long_neck:     { id: 'long_neck',     name: 'Long Neck',     tier: 2, price: 28, icon: 'i_long_neck', tags: ['ranged'],     stats: { range: 25, attackSpeed: -10 } },
+  raptor_claw:   { id: 'raptor_claw',   name: 'Raptor Claw',   tier: 2, price: 34, icon: 'i_raptor_claw', tags: ['crit', 'speed'],   stats: { critChance: 8, attackSpeed: 12, maxHp: -4 } },
+  magnet_rock:   { id: 'magnet_rock',   name: 'Magnet Rock',   tier: 2, price: 28, icon: 'i_magnet_rock', tags: ['greed'],   stats: { pickupRange: 40, harvesting: 5 }, limit: 4 },
+  mana_crystal:  { id: 'mana_crystal',  name: 'Mana Crystal',  tier: 2, price: 30, icon: 'i_mana_crystal', tags: ['mana'],  stats: { maxMana: 40, abilityPower: 15 } },
+  vampire_bat:   { id: 'vampire_bat',   name: 'Vampire Bat',   tier: 2, price: 36, icon: 'i_vampire_bat', tags: ['sustain'],   stats: { lifeSteal: 4, hpRegen: -2 }, limit: 4 },
+  coffee_bean:   { id: 'coffee_bean',   name: 'Coffee Bean',   tier: 2, price: 32, icon: 'i_coffee_bean', tags: ['speed'],   stats: { attackSpeed: 18, hpRegen: -3 } },
+  volcano_ash:   { id: 'volcano_ash',   name: 'Volcano Ash',   tier: 2, price: 34, icon: 'i_volcano_ash', tags: ['crit'],   stats: { critChance: 5 }, special: { burnOnCrit: 1 }, limit: 1, desc: 'Your crits set enemies on fire.' },
 
   // ---- Tier 3 (rare) ----
-  trex_skull:   { id: 'trex_skull',   name: 'T-Rex Skull',  tier: 3, price: 58, icon: 'i_trex_skull',   stats: { damage: 22, meleeDamage: 3, speed: -10 } },
-  comet_shard:  { id: 'comet_shard',  name: 'Comet Shard',  tier: 3, price: 54, icon: 'i_comet_shard',  stats: { abilityPower: 40, manaRegen: 3, maxHp: -6 } },
-  golden_egg:   { id: 'golden_egg',   name: 'Golden Egg',   tier: 3, price: 52, icon: 'i_golden_egg',   stats: { harvesting: 4 }, special: { lowHpAmber: 1 }, limit: 1, desc: '+1 amber per kill while you are below 50% HP.' },
-  herd_bond:    { id: 'herd_bond',    name: 'Herd Bond',    tier: 3, price: 50, icon: 'i_herd_bond',    stats: { maxHp: 4, manaRegen: 1 }, special: { herdBond: 40 }, limit: 1, desc: 'Reviving a mate gives you both 40 mana.' },
-  lucky_clover: { id: 'lucky_clover', name: 'Lucky Clover', tier: 3, price: 56, icon: 'i_lucky_clover', stats: { luck: 30, harvesting: 8 } },
-  thunder_egg:  { id: 'thunder_egg',  name: 'Thunder Egg',  tier: 3, price: 52, icon: 'i_thunder_egg',  stats: { maxMana: 20 }, special: { manaDiscount: 0.2 }, limit: 3, desc: 'Abilities cost 20% less mana.' },
-  tail_ring:    { id: 'tail_ring',    name: 'Tail Ring',    tier: 3, price: 54, icon: 'i_tail_ring',    stats: { meleeDamage: 2, armor: 3, rangedDamage: -2 } },
+  trex_skull:   { id: 'trex_skull',   name: 'T-Rex Skull',  tier: 3, price: 58, icon: 'i_trex_skull', tags: ['damage', 'melee'],   stats: { damage: 22, meleeDamage: 3, speed: -10 } },
+  comet_shard:  { id: 'comet_shard',  name: 'Comet Shard',  tier: 3, price: 54, icon: 'i_comet_shard', tags: ['mana'],  stats: { abilityPower: 40, manaRegen: 3, maxHp: -6 } },
+  golden_egg:   { id: 'golden_egg',   name: 'Golden Egg',   tier: 3, price: 52, icon: 'i_golden_egg', tags: ['greed'],   stats: { harvesting: 4 }, special: { lowHpAmber: 1 }, limit: 1, desc: '+1 amber per kill while you are below 50% HP.' },
+  herd_bond:    { id: 'herd_bond',    name: 'Herd Bond',    tier: 3, price: 50, icon: 'i_herd_bond', tags: ['mana'],    stats: { maxHp: 4, manaRegen: 1 }, special: { herdBond: 40 }, limit: 1, desc: 'Reviving a mate gives you both 40 mana.' },
+  lucky_clover: { id: 'lucky_clover', name: 'Lucky Clover', tier: 3, price: 56, icon: 'i_lucky_clover', tags: ['luck', 'greed'], stats: { luck: 30, harvesting: 8 } },
+  thunder_egg:  { id: 'thunder_egg',  name: 'Thunder Egg',  tier: 3, price: 52, icon: 'i_thunder_egg', tags: ['mana'],  stats: { maxMana: 20 }, special: { manaDiscount: 0.2 }, limit: 3, desc: 'Abilities cost 20% less mana.' },
+  tail_ring:    { id: 'tail_ring',    name: 'Tail Ring',    tier: 3, price: 54, icon: 'i_tail_ring', tags: ['melee', 'defense'],    stats: { meleeDamage: 2, armor: 3, rangedDamage: -2 } },
 
   // ---- Tier 4 (legendary) ----
-  meteor_heart:  { id: 'meteor_heart',  name: 'Meteor Heart',  tier: 4, price: 96,  icon: 'i_meteor_heart',  stats: { damage: 30, abilityPower: 30, armor: -3 }, limit: 2 },
-  ancient_amber: { id: 'ancient_amber', name: 'Ancient Amber', tier: 4, price: 88,  icon: 'i_ancient_amber', stats: { harvesting: 10 }, special: { amberBonus: 0.25 }, limit: 1, desc: '+25% amber from pickups.' },
-  mother_nest:   { id: 'mother_nest',   name: "Mother's Nest", tier: 4, price: 92,  icon: 'i_mother_nest',   stats: { maxHp: 15 }, special: { nestAura: 2 }, limit: 1, desc: 'Downed allies near you revive 2x faster.' },
-  dino_crown:    { id: 'dino_crown',    name: 'Dino Crown',    tier: 4, price: 110, icon: 'i_dino_crown',    stats: { damage: 10, meleeDamage: 2, rangedDamage: 2, abilityPower: 10, luck: 15 }, limit: 1 },
+  meteor_heart:  { id: 'meteor_heart',  name: 'Meteor Heart',  tier: 4, price: 96,  icon: 'i_meteor_heart', tags: ['damage', 'mana'],  stats: { damage: 30, abilityPower: 30, armor: -3 }, limit: 2 },
+  ancient_amber: { id: 'ancient_amber', name: 'Ancient Amber', tier: 4, price: 88,  icon: 'i_ancient_amber', tags: ['greed'], stats: { harvesting: 10 }, special: { amberBonus: 0.25 }, limit: 1, desc: '+25% amber from pickups.' },
+  mother_nest:   { id: 'mother_nest',   name: "Mother's Nest", tier: 4, price: 92,  icon: 'i_mother_nest', tags: ['defense'],   stats: { maxHp: 15 }, special: { nestAura: 2 }, limit: 1, desc: 'Downed allies near you revive 2x faster.' },
+  dino_crown:    { id: 'dino_crown',    name: 'Dino Crown',    tier: 4, price: 110, icon: 'i_dino_crown', tags: ['damage', 'luck'],    stats: { damage: 10, meleeDamage: 2, rangedDamage: 2, abilityPower: 10, luck: 15 }, limit: 1 },
+
+  // ======== Build-makers: items that change how you play and stack into combos ========
+  // (every one has `stats` even when empty, and a `desc` that states the mechanic; numbers: SPECIAL_RULES below)
+
+  // ---- Tier 1 ----
+  lucky_strike:   { id: 'lucky_strike',   name: 'Lucky Strike',   tier: 1, price: 18, icon: 'i_lucky_strike',   tags: ['crit', 'luck'], stats: { critChance: 10 },
+    special: { critMult: -0.25 }, limit: 3, desc: 'Crits are more common but hit softer: -0.25x crit damage.' },
+  serrated_tooth: { id: 'serrated_tooth', name: 'Serrated Tooth', tier: 1, price: 16, icon: 'i_serrated_tooth', tags: ['melee'], stats: {},
+    special: { bleed: 0.15 }, limit: 3, desc: 'Melee hits make enemies bleed for 15% of the hit over 2 s. Bleeds stack.' },
+  mana_leech:     { id: 'mana_leech',     name: 'Mana Leech',     tier: 1, price: 16, icon: 'i_mana_leech',     tags: ['mana'], stats: { maxHp: -2 },
+    special: { killMana: 0.5 }, limit: 3, desc: 'Every kill gives +0.5 mana.' },
+  piggy_egg:      { id: 'piggy_egg',      name: 'Piggy Egg',      tier: 1, price: 15, icon: 'i_piggy_egg',      tags: ['greed'], stats: { damage: -8 },
+    special: { waveAmber: 15 }, limit: 3, desc: '+15 amber at the end of every wave.' },
+
+  // ---- Tier 2 ----
+  dino_dynamite:  { id: 'dino_dynamite',  name: 'Dino Dynamite',  tier: 2, price: 34, icon: 'i_dino_dynamite',  tags: ['explosive'], stats: {},
+    special: { killBoom: 0.12 }, limit: 4, desc: 'Kills have a 12% chance to explode for 60% of the killing hit. Chances stack.' },
+  boom_boots:     { id: 'boom_boots',     name: 'Boom Boots',     tier: 2, price: 32, icon: 'i_boom_boots',     tags: ['explosive', 'speed'], stats: {},
+    special: { rollBomb: 1 }, limit: 1, desc: 'Your dodge roll drops a bomb that explodes 0.6 s later.' },
+  bouncy_pebbles: { id: 'bouncy_pebbles', name: 'Bouncy Pebbles', tier: 2, price: 34, icon: 'i_bouncy_pebbles', tags: ['ranged'], stats: {},
+    special: { bounceHit: 1 }, limit: 3, desc: 'Your projectiles bounce to 1 nearby enemy after hitting, for 70% damage.' },
+  sharp_eye:      { id: 'sharp_eye',      name: 'Sharp Eye',      tier: 2, price: 36, icon: 'i_sharp_eye',      tags: ['ranged'], stats: {},
+    special: { pierce: 1, pierceFalloff: 0.15 }, limit: 3, desc: '+1 pierce, and pierced hits lose 15 points less damage.' },
+  bloodthirst:    { id: 'bloodthirst',    name: 'Bloodthirst',    tier: 2, price: 34, icon: 'i_bloodthirst',    tags: ['crit', 'sustain'], stats: { critChance: 4, maxHp: -2 },
+    special: { critHeal: 1 }, limit: 3, desc: 'Crits heal 1 HP (up to 3 HP per second).' },
+  amber_vacuum:   { id: 'amber_vacuum',   name: 'Amber Vacuum',   tier: 2, price: 30, icon: 'i_amber_vacuum',   tags: ['greed'], stats: {},
+    special: { vacuum: 1 }, limit: 1, desc: 'Amber flies to you from twice as far and gives +1 XP each.' },
+  shockwave_club: { id: 'shockwave_club', name: 'Shockwave Club', tier: 2, price: 36, icon: 'i_shockwave_club', tags: ['melee'], stats: { meleeDamage: 2, speed: -5 },
+    special: { shockwave: 0.2, meleeKb: 0.5 }, limit: 2, desc: 'Melee hits knock enemies back harder, into the ones behind them, who take 20% of the hit.' },
+  hoard_heart:    { id: 'hoard_heart',    name: 'Hoard Heart',    tier: 2, price: 34, icon: 'i_hoard_heart',    tags: ['greed', 'damage'], stats: {},
+    special: { hoard: 1 }, limit: 1, desc: '+1% damage for every 25 amber you hold (max +40%). Spend it and the bonus fades.' },
+
+  // ---- Tier 3 ----
+  volatile_eggs:  { id: 'volatile_eggs',  name: 'Volatile Eggs',  tier: 3, price: 50, icon: 'i_volatile_eggs',  tags: ['explosive'], stats: { attackSpeed: -10 },
+    special: { blastSize: 0.4, blastDmg: 0.4 }, limit: 3, desc: '+40% explosion size and damage for all your explosions.' },
+  twin_quiver:    { id: 'twin_quiver',    name: 'Twin Quiver',    tier: 3, price: 52, icon: 'i_twin_quiver',    tags: ['ranged'], stats: {},
+    special: { extraShots: 1, rangedMult: -0.15 }, limit: 3, desc: 'Projectile weapons and turrets fire 1 extra shot in a small spread. All ranged damage -15%.' },
+  egg_clutch:     { id: 'egg_clutch',     name: 'Egg Clutch',     tier: 3, price: 54, icon: 'i_egg_clutch',     tags: ['summon'], stats: {},
+    special: { clutch: 1 }, limit: 2, desc: 'Each turret weapon you hold gets +1 turret, each drone weapon +1 pterodactyl.' },
+  pack_leader:    { id: 'pack_leader',    name: 'Pack Leader',    tier: 3, price: 46, icon: 'i_pack_leader',    tags: ['summon'], stats: {},
+    special: { summonDmg: 0.4, ownDmg: -0.1 }, limit: 2, desc: 'Turrets and pterodactyls deal +40% damage. Your other weapons deal -10%.' },
+  chain_spark:    { id: 'chain_spark',    name: 'Chain Spark',    tier: 3, price: 52, icon: 'i_chain_spark',    tags: ['crit'], stats: { critChance: 4 },
+    special: { chainZap: 1 }, limit: 2, desc: 'Crits zap the nearest other enemy within 160 px for 50% damage.' },
+  spell_echo:     { id: 'spell_echo',     name: 'Spell Echo',     tier: 3, price: 54, icon: 'i_spell_echo',     tags: ['mana'], stats: { manaRegen: -1 },
+    special: { spellEcho: 1 }, limit: 1, desc: 'Your ability fires a second, 50% strength copy 0.4 s later, for no extra mana.' },
+  berserker_sap:  { id: 'berserker_sap',  name: 'Berserker Sap',  tier: 3, price: 50, icon: 'i_berserker_sap',  tags: ['cursed', 'speed'], stats: { armor: -3 },
+    special: { berserkAs: 30 }, limit: 1, desc: '+30% attack speed while you are below half HP.' },
+
+  // ---- Tier 4 ----
+  glass_jaw:      { id: 'glass_jaw',      name: 'Glass Jaw',      tier: 4, price: 88, icon: 'i_glass_jaw',      tags: ['cursed', 'damage'], stats: { damage: 40 },
+    special: { halfHp: 1 }, limit: 1, desc: 'Your max HP is cut in half. Do not get hit.' },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS);
+
+/** Item tags, in the order the shop shows them. `name` is the chip text. */
+export const TAGS = {
+  melee: 'Melee', ranged: 'Ranged', explosive: 'Explosive', summon: 'Summon', crit: 'Crit', mana: 'Mana',
+  greed: 'Greed', defense: 'Defense', sustain: 'Sustain', speed: 'Speed', luck: 'Luck', damage: 'Damage', cursed: 'Cursed',
+};
 
 /** Numbers behind the special effects (read by damage.js, downed.js, pickups.js, stats.js). */
 export const SPECIAL_RULES = {
@@ -60,6 +122,41 @@ export const SPECIAL_RULES = {
   manaDiscountCap: 0.6,
   // Mother's Nest: revive speed multiplier applies to downed allies within this many px of the holder.
   nestAura: { radius: 150 },
+
+  // ---- build-maker items (src/sim/hooks.js unless noted) ----
+  // Dino Dynamite: a kill explodes (chance = killBoom) for `dmgFrac` of the killing hit in `radius` px.
+  // `maxDepth` stops a chain of explosions from going on forever (a blast that kills can set off the next).
+  dynamite: { dmgFrac: 0.6, radius: 70, maxDepth: 2 },
+  // Boom Boots: the bomb waits `fuse` s, then hits everything in `radius` px for dmg (grows with the wave and Damage %).
+  rollBomb: { fuse: 0.6, radius: 85, dmg: 26, perWave: 0.12 },
+  // Twin Quiver: extra shots fan out `spreadDeg` degrees apart; rangedMult never drops below `minMult`.
+  twinQuiver: { spreadDeg: 9, minMult: 0.4 },
+  // Bouncy Pebbles: a bounce looks for a target within `radius` px of the enemy it just hit, at `dmgFrac` of its damage.
+  bounce: { radius: 220, dmgFrac: 0.7 },
+  // Bloodthirst: at most `perSec` HP healed per second this way.
+  critHeal: { perSec: 3 },
+  // Chain Spark: the zap reaches `radius` px and deals `dmgFrac` of the crit.
+  chainZap: { radius: 160, dmgFrac: 0.5 },
+  // Spell Echo: the copy comes `delay` s later at `strength` of the ability.
+  spellEcho: { delay: 0.4, strength: 0.5 },
+  // Hoard Heart: +pct% damage per `per` amber held, up to `max`%.
+  hoard: { per: 25, pct: 1, max: 40 },
+  // Shockwave Club: the knocked enemy shoves those within `radius` px of it, on its far side (dot > 0 of the knock direction).
+  shockwave: { radius: 90 },
+  // Serrated Tooth: a bleed lasts `time` s; one enemy carries at most `maxStacks`.
+  bleed: { time: 2, maxStacks: 8 },
+  // Piggy Egg and Amber Vacuum: the wave-end amber also pays XP like Harvesting; the vacuum gives `vacuumXp` XP per pickup per copy.
+  vacuumXp: 1,
+};
+
+/** Loot crates (src/sim/crates.js). */
+export const CRATE_RULES = {
+  chance: 0.007,       // a normal kill drops a crate this often at 0 Luck (~0.8 crates a wave)
+  luckScale: 200,      // ...x(1 + Luck / luckScale), so +100 Luck is x1.5
+  maxPerWave: 2,       // per player and wave (elites ignore the cap)
+  heal: 3,             // HP healed when a crate is picked up
+  recycle: 0.25,       // Recycle pays this fraction of the item's shop price in amber
+  eliteRolls: 2,       // an elite or boss crate rolls the rarity this many times and keeps the best
 };
 
 /** Shop offer rules (slots, prices and reroll growth are in BALANCE.shop). */
@@ -70,6 +167,7 @@ export const SHOP_RULES = {
   ownedWeaponChance: 0.20,                // a weapon offer repeats a weapon you hold
   ownedClassChance: 0.15,                 // ...or another weapon of a class you hold
   tierPrice: [1, 1.9, 3.6, 6.8],          // weapon price multiplier by tier I-IV
+  tagLeanChance: 0.25,                    // an item offer is drawn from items sharing a tag with your build this often
 };
 
 // Shop and level-up rarity chance at 0 Luck (matches docs/brotato-reference.md section 3).

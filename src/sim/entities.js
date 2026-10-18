@@ -5,7 +5,7 @@
 //   enemies     {id, type, x, y, r, hp, maxHp, facing, flash, stun, burn, tele, elite, boss, dead}
 //   projectiles {id, kind, pid, x, y, vx, vy, r, dmg, ..., dead}   player-owned shots
 //   shots       {id, x, y, vx, vy, r, dmg, dead}                   enemy shots (magenta)
-//   pickups     {id, kind:'amber'|'berry', x, y, v, dead}
+//   pickups     {id, kind:'amber'|'berry'|'crate', x, y, v, dead}   (crate: v 1 normal, 2 from an elite)
 //   hazards     {id, kind, x, y, r, t, dur, delay, owner:'enemy'|'player', ..., dead}
 //   summons     {id, kind, pid, x, y, r, ..., dead}                player turrets / drones
 //   marks       {x, y, type, t}                                    spawn markers
@@ -30,7 +30,7 @@ export function createPlayer(w, { id, name, char }) {
   return {
     id, name: name || `Player ${id + 1}`, char: c.id,
     x: 0, y: 0, r: BALANCE.player.radius, facing: 1, moving: false,
-    hp: 1, mana: 0, stats: {},
+    hp: 1, mana: 0, stats: {}, specials: {},
     weapons: [{ wid: c.weapon, tier: 1, cd: 0.5, uid: 1 }],
     nextWeaponUid: 2,
     items: [],          // item ids (duplicates allowed)
@@ -45,6 +45,10 @@ export function createPlayer(w, { id, name, char }) {
     rollT: 0, rollCd: 0, rollDx: 1, rollDy: 0, drSeen: -1,
     input: { mx: 0, my: 0, ab: 0, dr: 0 }, lastSeq: 0,
     ready: false, shop: null, levelChoices: null,
+    crates: [],         // loot crates picked up this wave ({elite}); they become crateOffers at wave end (crates.js)
+    crateOffers: [],    // crates waiting to be taken or recycled in the shop ({cid, id, tier, price, recycle, elite})
+    cratesDropped: 0,   // crates this player's kills dropped this wave (capped by CRATE_RULES.maxPerWave)
+    critHealAcc: 0,     // Bloodthirst: HP healed from crits recently (drains over time, caps the heal rate)
     score: {
       kills: 0, damageDealt: 0, damageTaken: 0, revives: 0, healing: 0,
       amber: 0, casts: 0, downs: 0, firstFallTick: -1, byWeapon: {},
@@ -90,6 +94,9 @@ export function spawnEnemy(w, type, x, y, extra = {}) {
 
 export function spawnProjectile(w, p) {
   const proj = { id: newId(w), r: 8, pierce: 0, hitIds: [], life: 2, dead: false, kb: 0, ...p };
+  // Bouncy Pebbles: ordinary shots (not lobbed or exploding ones) get the owner's bounces.
+  const owner = proj.pid >= 0 ? w.players[proj.pid] : null;
+  if (owner && owner.specials?.bounceHit > 0 && !proj.noHit && !proj.boom) proj.bnc = owner.specials.bounceHit;
   w.projectiles.push(proj);
   return proj;
 }

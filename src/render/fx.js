@@ -527,6 +527,11 @@ export class Fx {
         sfx.play('amber', { rate: sfx.amberRate(), vol: 0.9 });
         if (ev.v >= 5 && this.pickT <= 0) { this.pickT = 0.2; this.number(ev.x, ev.y - 22, `+${ev.v}`, AMBER, 19, 0.7, 0.1); }
       } else this.sfxAt('amber', ev.x, ev.y, 0.3, 0, 1.2);
+    } else if (ev.kind === 'crate') {
+      this.ring(ev.x, ev.y, AMBER, 10, 90, 0.45, 8);
+      this.spark(ev.x, ev.y, AMBER, 12);
+      this.word(ev.x, ev.y - 50, 'CRATE!', AMBER, 26, 1.1);
+      if (mine) { sfx.play('levelup'); sfx.play('buy'); } else this.sfxAt('buy', ev.x, ev.y, 0.6);
     } else {
       this.puff(ev.x, ev.y, GREEN, 8);
       this.plus(ev.x, ev.y, 3);

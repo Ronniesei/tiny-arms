@@ -6,6 +6,8 @@ import { moveSpeed, regenPerSec } from '../stats.js';
 import { healPlayer } from './damage.js';
 import { BALANCE } from '../../data/balance.js';
 import { CHARACTERS } from '../../data/characters.js';
+import { SPECIAL_RULES } from '../../data/items.js';
+import { onRoll } from '../hooks.js';
 
 /** Shared by host simulation and client prediction. Mutates pos {x, y, r}. */
 export function predictMove(pos, mx, my, speed, dt) {
@@ -30,6 +32,7 @@ function startRoll(w, p, mx, my) {
   p.iframes = Math.max(p.iframes, R.iframes);
   if (p.rollDx > 0.05) p.facing = 1; else if (p.rollDx < -0.05) p.facing = -1;
   emit(w, { type: 'roll', pid: p.id, x: Math.round(p.x), y: Math.round(p.y), a: +Math.atan2(p.rollDy, p.rollDx).toFixed(2) });
+  onRoll(w, p); // Boom Boots drop a bomb
 }
 
 function herdCount(w, p) {
@@ -53,6 +56,10 @@ export function update(w, dt) {
     p.reviveBoostT = Math.max(0, p.reviveBoostT - dt);
     p.tauntT = Math.max(0, p.tauntT - dt);
     p.lifeStealAcc = Math.max(0, p.lifeStealAcc - BALANCE.stat.lifeStealCapPerSec * dt);
+    p.critHealAcc = Math.max(0, (p.critHealAcc || 0) - SPECIAL_RULES.critHeal.perSec * dt); // Bloodthirst heal rate cap
+    // Berserker Sap: attack speed while below half HP (weaponCooldown reads stats.berserkAs).
+    const berserk = p.specials?.berserkAs || 0;
+    if (berserk > 0 || p.stats.berserkAs) p.stats.berserkAs = berserk > 0 && !p.downed && p.hp < p.stats.maxHp * 0.5 ? berserk : 0;
     if (p.drSeen < 0) p.drSeen = p.input.dr || 0;
     if (p.downed) { p.moving = false; p.drSeen = p.input.dr || 0; p.rollT = 0; continue; }
 

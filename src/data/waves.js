@@ -18,15 +18,17 @@ export const SPAWN_START = 0.4;
 export const SPAWN_END_QUIET = 1.5;
 
 // Playtest (17 Oct): waves felt short and easy, so they start at 30 s and grow to 70 s.
-const DUR = [30, 35, 40, 45, 50, 55, 60, 65, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 0];
+// Owner (18 Oct): "boring after a few rounds". Brotato's rhythm is short dense waves and frequent shops,
+// so waves start at 25 s and grow 4 s per wave to a 60 s cap, dense from the first second.
+const DUR = [25, 29, 33, 37, 41, 45, 49, 53, 57, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 0];
 
 /** Spawn rate grows every wave; within a wave it ramps (see RAMP), so each wave builds to a crescendo. */
-export const RAMP = { start: 0.6, end: 1.4 };
-const ratePerSec = (wave) => 1.5 + 0.36 * (wave - 1) + 0.12 * Math.max(0, wave - 7); // review rounds 2 and 6: denser mid and late
+export const RAMP = { start: 0.8, end: 1.2 }; // averages 1x, so W.total stays true
+const ratePerSec = (wave) => 1.9 + 0.38 * (wave - 1) + 0.12 * Math.max(0, wave - 7); // review rounds 2 and 6: denser mid and late
 
 // Review round 1: a Brotato wave is a horde of weak enemies. More enemies must not mean more money,
 // so amber income is pinned per wave and each kill's drop chance is derived from it (W.drop).
-const amberPerSec = (wave) => 1.65 + 0.083 * (wave - 1);
+const amberPerSec = (wave) => 2.1 + 0.12 * (wave - 1); // more buys per shop (builds need purchases)
 
 //          wave  total  mix
 const ROWS = [

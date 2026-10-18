@@ -22,8 +22,8 @@ export const SPRITES = {
   p_spike: [22, 0xb0a090, 'dart'], p_egg: [14, 0xfff4dc, 'dot'],
   // Summons
   s_turret: [44, 0xf0e8d0, 'blob'], s_ptero: [44, 0x9a8aaa, 'blob'],
-  // Pickups (viewBox 32)
-  amber: [22, 0xffb627, 'gem'], berry: [24, 0xd03a5a, 'dot'],
+  // Pickups (viewBox 32; the loot crate is drawn at viewBox 64)
+  amber: [22, 0xffb627, 'gem'], berry: [24, 0xd03a5a, 'dot'], crate: [42, 0xb98a4a, 'box'],
   // Arena props (viewBox 64)
   rock1: [80, 0x7a7068, 'rock'], rock2: [70, 0x6a6058, 'rock'], rock3: [90, 0x5a4a44, 'rock'],
   pebbles: [40, 0xa89a72, 'dot'], fern: [56, 0x8a9a5a, 'bush'],
@@ -54,6 +54,9 @@ export function drawPlaceholder(scene, key, size, color, shape) {
   } else if (shape === 'gem') {
     g.fillPoints([{ x: c, y: s * 0.08 }, { x: s * 0.88, y: c }, { x: c, y: s * 0.92 }, { x: s * 0.12, y: c }], true);
     g.strokePoints([{ x: c, y: s * 0.08 }, { x: s * 0.88, y: c }, { x: c, y: s * 0.92 }, { x: s * 0.12, y: c }], true);
+  } else if (shape === 'box') {
+    g.fillRoundedRect(s * 0.12, s * 0.2, s * 0.76, s * 0.62, s * 0.08); g.strokeRoundedRect(s * 0.12, s * 0.2, s * 0.76, s * 0.62, s * 0.08);
+    g.lineBetween(s * 0.12, s * 0.5, s * 0.88, s * 0.5);
   } else if (shape === 'rock') {
     g.fillEllipse(c, c + s * 0.05, s * 0.86, s * 0.66); g.strokeEllipse(c, c + s * 0.05, s * 0.86, s * 0.66);
   } else if (shape === 'bush') {

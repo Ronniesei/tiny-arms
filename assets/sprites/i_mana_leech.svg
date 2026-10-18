@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<g stroke="#2b2118" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<path d="M32 4 C42 18 50 28 50 39 C50 49 42 57 32 57 C22 57 14 49 14 39 C14 28 22 18 32 4 Z" fill="#4aa8ff"/>
+<path d="M48 38 C48 48 41 55 32 55 C40 50 44 44 44 37 C44 31 41 25 37 19 C45 28 48 33 48 38 Z" fill="#2f7acc" stroke="none"/>
+<path d="M20 38 C20 31 23 26 27 21" fill="none" stroke="#d6ecff" stroke-width="3.500"/>
+<path d="M8 50 C16 40 28 52 40 44 C46 40 48 36 52 32" fill="none" stroke-width="15"/>
+<path d="M8 50 C16 40 28 52 40 44 C46 40 48 36 52 32" fill="none" stroke="#7a4aa8" stroke-width="7"/>
+<path d="M16 46 L17 50 M24 49 L24 53 M32 49 L31 53 M40 44 L42 47" fill="none" stroke="#a578d0" stroke-width="2.500"/>
+<circle cx="52" cy="30" r="7.500" fill="#7a4aa8"/>
+<circle cx="49.500" cy="27.500" r="2.600" fill="#fff" stroke-width="1.800"/>
+<circle cx="56" cy="27.500" r="2.600" fill="#fff" stroke-width="1.800"/>
+<circle cx="50.200" cy="28" r="1.100" fill="#2b2118" stroke="none"/>
+<circle cx="56.600" cy="28" r="1.100" fill="#2b2118" stroke="none"/>
+<path d="M50 33.500 Q53 36 56 33.500" fill="#d83a5a" stroke-width="2"/>
+</g>
+</svg>

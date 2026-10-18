@@ -669,6 +669,15 @@ export class GameScene extends Phaser.Scene {
           const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * h.r;
           this.fx.ember(h.x + Math.cos(a) * d, h.y + Math.sin(a) * d * 0.8);
         }
+      } else if (h.kind === 'bomb') {
+        // Boom Boots: a ring that blinks faster as the fuse runs down, with a little lit bomb in the middle.
+        if (h.p < 1) {
+          const hot = Math.sin(t * (10 + 34 * h.p)) > 0;
+          g.fillStyle(AMBER, 0.1 + 0.2 * h.p).fillCircle(h.x, h.y, h.r * (0.25 + 0.75 * h.p));
+          g.lineStyle(4, hot ? 0xffffff : AMBER, 0.9).strokeCircle(h.x, h.y, h.r);
+          g.fillStyle(0x2b2118, 1).fillCircle(h.x, h.y, 9);
+          g.fillStyle(hot ? 0xffe14a : 0xff7a2a, 1).fillCircle(h.x + 4, h.y - 9, 3.5);
+        }
       } else if (h.p < 1) {
         g.lineStyle(3, AMBER, 0.6).strokeCircle(h.x, h.y, h.r);
       }
@@ -764,10 +773,12 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < list.length; i++) {
       const pk = list[i];
       const berry = pk.kind === 'berry';
+      const crate = pk.kind === 'crate'; // loot crate: a chunky wooden box with an amber glow (gold from an elite)
       let r = this.pools.pickups.get(pk.id);
       if (!r) {
-        r = { body: this.addWorld(this.add.image(pk.x, pk.y, berry ? 'berry' : 'amber').setScale(0.5), 4), ph: Math.random() * 6, born: t, px: pk.x, py: pk.y, tt: 0, seen: 0 };
+        r = { body: this.addWorld(this.add.image(pk.x, pk.y, crate ? 'crate' : berry ? 'berry' : 'amber').setScale(0.5), 4), ph: Math.random() * 6, born: t, px: pk.x, py: pk.y, tt: 0, seen: 0 };
         this.pools.pickups.set(pk.id, r);
+        if (crate) this.fx.ring(pk.x, pk.y, pk.gold ? 0xffd24a : AMBER, 10, 70, 0.45, 6); // a crate pops in with a ring so you notice it
       }
       r.seen = this.frameNo;
       const dx = pk.x - r.px, dy = pk.y - r.py;
@@ -781,10 +792,14 @@ export class GameScene extends Phaser.Scene {
       r.body.setPosition(pk.x, pk.y + by).setScale(0.5 * pulse);
       if (pk.x > this.vx0 && pk.x < this.vx1 && pk.y > this.vy0 && pk.y < this.vy1) {
         const gl = this.glowPool.get();
-        gl.setPosition(pk.x, pk.y + by).setScale((berry ? 0.45 : 0.5 + 0.08 * Math.sin(t * 6 + r.ph)) * (flying ? 1.3 : 1)).setTint(berry ? 0x7dff6a : AMBER).setAlpha(berry ? 0.4 : 0.55);
+        const glowCol = berry ? 0x7dff6a : crate && pk.gold ? 0xffe27a : AMBER;
+        gl.setPosition(pk.x, pk.y + by).setScale((berry ? 0.45 : crate ? 0.95 + 0.12 * Math.sin(t * 5 + r.ph) : 0.5 + 0.08 * Math.sin(t * 6 + r.ph)) * (flying ? 1.3 : 1)).setTint(glowCol).setAlpha(berry ? 0.4 : crate ? 0.75 : 0.55);
         if (flying) {
           r.tt -= dt;
-          if (r.tt <= 0) { r.tt = 0.03; this.fx.trail(pk.x, pk.y, berry ? 0x7dff6a : AMBER); }
+          if (r.tt <= 0) { r.tt = 0.03; this.fx.trail(pk.x, pk.y, glowCol); }
+        } else if (crate) {
+          r.tt -= dt;
+          if (r.tt <= 0) { r.tt = 0.35; this.fx.spark(pk.x + (Math.random() - 0.5) * 30, pk.y - 14, glowCol, 1); } // twinkle
         }
       }
     }
