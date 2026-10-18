@@ -258,7 +258,7 @@ function ownedSummons(w, pid, wuid, kind) {
 /** Per-frame upkeep for summon weapons: (w, player, weapon, def, slotIndex) => void. Needs no target. */
 export const MAINTAIN = {
   drone(w, p, wpn, def, slot) {
-    const want = 1 + (p.specials?.clutch || 0); // Egg Clutch: +1 pterodactyl per copy
+    const want = 1 + (p.specials?.clutch || 0) + (p.stats.extraSummons || 0); // Egg Clutch: +1 pterodactyl per copy; Bolt's Workshop: +1
     const have = ownedSummons(w, p.id, wpn.uid, 'ptero');
     if (have >= want) return;
     spawnSummon(w, {
@@ -268,7 +268,7 @@ export const MAINTAIN = {
   },
 
   turret(w, p, wpn, def, slot) {
-    const want = (tierVal(def.count, wpn.tier) || 1) + (p.specials?.clutch || 0); // Egg Clutch: +1 turret per copy
+    const want = (tierVal(def.count, wpn.tier) || 1) + (p.specials?.clutch || 0) + (p.stats.extraSummons || 0); // Egg Clutch: +1 turret per copy; Bolt's Workshop: +1
     const have = ownedSummons(w, p.id, wpn.uid, 'turret');
     if (have >= want) return;
     const q = pointNear(w, p.x, p.y);

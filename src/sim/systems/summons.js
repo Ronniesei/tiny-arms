@@ -3,6 +3,7 @@
 //
 // Every summon has {id, kind, pid, x, y, a (facing angle), r, wuid (uid of the owning weapon), wid}.
 // A summon dies by itself when its owner leaves or its weapon is sold / replaced.
+// Hero/ability hooks: Bolt's Workshop (damage in stats.js, extra summons in weapons.js MAINTAIN) and Overclock (summonRate below).
 // Item hooks: Pack Leader's damage bonus lives in stats.js weaponDamage (summons read the same numbers as weapons);
 // Egg Clutch adds summons in weapons.js MAINTAIN; Twin Quiver fans extra turret shots here; Sharp Eye and Bouncy Pebbles
 // work through the projectile fields (pierce, falloff, bnc).
@@ -14,6 +15,12 @@ import { range } from '../rng.js';
 import { weaponCooldown, weaponDamage, weaponRange } from '../stats.js';
 import { hitEnemy, rollCrit } from './damage.js';
 import { PIERCE_FALLOFF, fan } from './weapons.js';
+
+/** Bolt's Overclock: while it runs, the owner's summons count their cooldowns down this many times faster. */
+function summonRate(p) {
+  const st = p.abState;
+  return st && st.id === 'overclock' ? st.rate : 1;
+}
 
 /** The weapon instance and definition a summon belongs to, or null when it no longer exists. */
 function ownerWeapon(w, s, behaviour) {
@@ -42,7 +49,7 @@ export const SUMMON_KINDS = {
       const o = ownerWeapon(w, s, 'drone');
       if (!o) { s.dead = true; return; }
       const { p, wpn, def } = o;
-      s.cd -= dt;
+      s.cd -= dt * summonRate(p);
       const px = s.x, py = s.y;
 
       if (s.st === 'dive') {
@@ -113,7 +120,7 @@ export const SUMMON_KINDS = {
         }
       } else s.farT = 0;
 
-      s.cd -= dt;
+      s.cd -= dt * summonRate(p);
       if (s.cd > 0) return;
       const reach = weaponRange(def, p.stats);
       const target = nearestEnemy(w, s.x, s.y, reach);

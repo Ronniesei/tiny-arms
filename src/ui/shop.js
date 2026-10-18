@@ -6,10 +6,11 @@
 
 import { WEAPONS, CLASSES } from '../data/weapons.js';
 import { eliteTypeFor } from '../data/danger.js';
+import { tip as tipAttr } from './tips.js';
 import { ITEMS } from '../data/items.js';
 import { BALANCE } from '../data/balance.js';
 import { WAVES } from '../data/waves.js';
-import { STAT_KEYS, STAT_LABELS, activeClassBonuses, classCounts } from '../sim/stats.js';
+import { STAT_KEYS, STAT_LABELS, activeClassBonuses, classCounts, maxWeaponsOf } from '../sim/stats.js';
 import { weaponPrice, ownedTags } from '../sim/shop.js';
 import { PLAYER_COLORS_CSS } from '../render/art.js';
 import {
@@ -49,14 +50,21 @@ function countItems(items) {
 }
 
 /** Lines -> <li>s. Key/value lines are laid out in two columns, notes are small and muted. */
+// Weapon card labels -> glossary keys (src/ui/tips.js).
+const LABEL_TIP = {
+  Damage: 'w_damage', Cooldown: 'w_cooldown', DPS: 'w_dps', Range: 'w_range', Reach: 'w_reach', Crit: 'w_crit',
+  Pierce: 'w_pierce', 'Blast radius': 'w_blast', Bounces: 'w_bounces', 'Burning ground': 'w_fire', Burn: 'w_burn',
+  Turrets: 'w_turrets', Knockback: 'w_knockback',
+};
+
 function linesHtml(lines) {
   return lines.map((l) => {
     if (l.note) return `<li class="note${l.effect ? ' fx' : ''}">${esc(l.text)}</li>`;
     const good = l.good === true ? 'good' : l.good === false ? 'bad' : '';
     if (l.label !== undefined && l.value !== undefined) {
-      return `<li class="kv ${good} ${l.strong ? 'strong' : ''}"><span>${esc(l.label)}</span><b>${esc(l.value)}</b>${l.detail ? `<small>${esc(l.detail)}</small>` : ''}</li>`;
+      return `<li class="kv ${good} ${l.strong ? 'strong' : ''}"${tipAttr(l.key || LABEL_TIP[l.label])}><span>${esc(l.label)}</span><b>${esc(l.value)}</b>${l.detail ? `<small>${esc(l.detail)}</small>` : ''}</li>`;
     }
-    return `<li class="${good}">${esc(l.text)}</li>`;
+    return `<li class="${good}"${tipAttr(l.key)}>${esc(l.text)}</li>`;
   }).join('');
 }
 
@@ -121,7 +129,7 @@ function headerHtml(me, v, now, danger = 1) {
     ? `<i class="adelta ${track.amberDelta > 0 ? 'good' : 'bad'}" style="animation-delay:-${Math.round(now - track.amberAt)}ms">${track.amberDelta > 0 ? '+' : ''}${track.amberDelta}</i>` : '';
   const mates = me.team.map((t) => {
     const you = t.id === me.id;
-    return `<span class="mate ${t.ready ? 'ready' : ''} ${you ? 'you' : ''}" style="--pc:${PLAYER_COLORS_CSS[t.id % 4]}" title="${esc(t.name)}${t.ready ? ' is ready' : ' is shopping'}">`
+    return `<span class="mate ${t.ready ? 'ready' : ''} ${you ? 'you' : ''}" style="--pc:${PLAYER_COLORS_CSS[t.id % 4]}" data-tip-text="${esc(t.name)}${t.ready ? ' is ready' : ' is shopping'}">`
       + `<img src="${SPR(`h_${t.char}`)}" ${IMG_ERR} alt=""><b>${esc(t.name)}</b>`
       + `<span class="tick">${t.ready ? ICON.check : '<i class="dots"></i>'}</span></span>`;
   }).join('');
@@ -131,12 +139,12 @@ function headerHtml(me, v, now, danger = 1) {
       <div class="title">Wave ${me.wave} cleared</div>
       <div class="sub">Next: wave ${me.wave + 1} ${nextTag}</div>
     </div>
-    <div class="amberbox" title="Your amber">${AMBER}<b>${me.amber}</b>${amberFlash}</div>
+    <div class="amberbox"${tipAttr('amber')}>${AMBER}<b>${me.amber}</b>${amberFlash}</div>
     ${me.team.length > 1
       ? `<div class="timer"><span>Next wave in <b data-shop-timer>${time}</b>s</span><i class="bar"><u style="animation-duration:${total}s;animation-delay:-${elapsed.toFixed(1)}s"></u></i></div>`
       : '<div class="timer"><span>Take your time</span></div>'}
     <div class="team">${mates}</div>
-    <button class="big go readybtn ${me.ready ? 'on' : ''}" data-act="shopready"${crates ? ' title="You still have loot crates. Going now opens them for you (you take the items)."' : levels ? ' title="You still have a level-up to pick. It carries over if you go now."' : ''}><span>${readyLabel}</span><kbd>Space</kbd></button>
+    <button class="big go readybtn ${me.ready ? 'on' : ''}" data-act="shopready"${tipAttr('ready')}${crates ? ' data-tip-text="You still have loot crates. Going now opens them for you (you take the items)."' : levels ? ' data-tip-text="You still have a level-up to pick. It carries over if you go now."' : ''}><span>${readyLabel}</span><kbd>Space</kbd></button>
   </header>`;
 }
 
@@ -174,7 +182,7 @@ function tagChips(id, owned) {
   if (!tags.length) return '';
   return `<div class="tags">${tags.map((t) => {
     const n = owned[t.id] || 0;
-    return `<span class="tag t-${t.id}${n > 0 ? ' on' : ''}"${n > 0 ? ` title="Your build already has ${n} ${esc(t.name)}"` : ''}>${esc(t.name)}${n > 0 ? `<i>${n}</i>` : ''}</span>`;
+    return `<span class="tag t-${t.id}${n > 0 ? ' on' : ''}"${tipAttr('tag_' + t.id)}${n > 0 ? ` data-tip-text="Your build already has ${n} ${esc(t.name)}"` : ''}>${esc(t.name)}${n > 0 ? `<i>${n}</i>` : ''}</span>`;
   }).join('')}</div>`;
 }
 
@@ -195,8 +203,8 @@ function crateCard(c, i, me, owned) {
       <ul class="lines">${linesHtml(itemLines(c.id))}${own}</ul>
     </div>
     <div class="cbtns">
-      <button class="take ${full ? 'off' : ''}" ${ids} data-take="1"${full ? ' disabled title="You cannot hold more of this item. Recycle it instead."' : ''}>${full ? 'Limit reached' : 'Take'}${kbd(1)}</button>
-      <button class="recycle" ${ids} data-take="0" title="Sell the item back for ${c.recycle} amber (25% of its price ${c.price})">Recycle ${AMBER} +${c.recycle}${kbd(2)}</button>
+      <button class="take ${full ? 'off' : ''}" ${ids} data-take="1"${full ? ' disabled data-tip-text="You cannot hold more of this item. Recycle it instead."' : ''}>${full ? 'Limit reached' : 'Take'}${kbd(1)}</button>
+      <button class="recycle" ${ids} data-take="0" data-tip-text="Sell the item back for ${c.recycle} amber (25% of its price ${c.price})">Recycle ${AMBER} +${c.recycle}${kbd(2)}</button>
     </div>
   </article>`;
 }
@@ -233,7 +241,7 @@ function levelHtml(me) {
     <div class="sechead">
       <h2>Level up! Pick a stat</h2>
       <span class="hint">Level ${lvl} · pick 1 of ${me.levelChoices.length}${more > 0 ? ` · ${more} more level-up${more > 1 ? 's' : ''} after this` : ''}</span>
-      <button class="reroll ${poor ? 'poor' : ''}" data-act="levelReroll" title="New level-up cards">${ICON.dice} Reroll ${AMBER} ${cost}<kbd>Shift+R</kbd></button>
+      <button class="reroll ${poor ? 'poor' : ''}" data-act="levelReroll"${tipAttr('levelup')} data-tip-text="New level-up cards">${ICON.dice} Reroll ${AMBER} ${cost}<kbd>Shift+R</kbd></button>
     </div>
     <div class="lvcards">${cards}</div>
   </section>`;
@@ -248,7 +256,7 @@ function shopHtml(me) {
     <div class="sechead">
       <h2>Shop</h2>
       <span class="hint">Buy all 4 for a free reroll · Lock keeps an offer for next wave</span>
-      <button class="reroll ${poor ? 'poor' : ''}" data-act="reroll" title="Roll 4 new offers (locked ones stay)">${ICON.dice} Reroll ${AMBER} ${cost}<kbd>R</kbd></button>
+      <button class="reroll ${poor ? 'poor' : ''}" data-act="reroll"${tipAttr('reroll')} data-tip-text="Roll 4 new offers (locked ones stay)">${ICON.dice} Reroll ${AMBER} ${cost}<kbd>R</kbd></button>
     </div>
     <div class="offers">${me.shop.offers.map((o, i) => offerCard(o, i, me)).join('')}</div>
   </section>`;
@@ -258,12 +266,18 @@ function shopHtml(me) {
 function analyse(o, me) {
   const out = { afford: me.amber >= o.price, ribbons: [], hint: '', blocked: false, buyLabel: '' };
   if (o.kind === 'weapon') {
-    const full = me.weapons.length >= BALANCE.shop.maxWeapons;
+    const maxW = maxWeaponsOf(me.char);
+    const full = me.weapons.length >= maxW;
     const pair = o.tier < 4 && me.weapons.some((w) => w.wid === o.id && w.tier === o.tier);
     if (pair) {
       out.merge = true;
       out.ribbons.push({ cls: 'merge', text: full ? `Auto-merges into ${ROMAN[o.tier]}` : `Merges into ${ROMAN[o.tier]}` });
       if (!full) out.hint = `Buy it, then press Merge on your ${WEAPONS[o.id]?.name} to make a tier ${ROMAN[o.tier]}.`;
+    } else if (full && maxW === 1 && me.weapons.length === 1) {
+      // One weapon slot (Pip's Lone Arm): the new weapon takes the slot and the old one is sold.
+      const old = me.weapons[0];
+      out.ribbons.push({ cls: 'swap', text: 'Replaces your weapon' });
+      out.hint = `It takes your only slot: your ${WEAPONS[old.wid]?.name} ${ROMAN[old.tier - 1]} is sold for ${sellValue(old, me.wave)} amber.`;
     } else if (full) {
       out.blocked = true;
       out.ribbons.push({ cls: 'full', text: 'Slots full' });
@@ -296,7 +310,7 @@ export function offerCard(o, i, me) {
   const set = a.set
     ? `<div class="setnote">Set bonus: <b>${esc(a.set.name)} (${a.set.threshold})</b> ${esc(a.set.text)}</div>` : '';
   const state = !a.afford ? 'poor' : a.blocked ? 'blocked' : '';
-  const need = a.afford ? '' : ` title="Need ${o.price - me.amber} more amber"`;
+  const need = a.afford ? '' : ` data-tip-text="Need ${o.price - me.amber} more amber"`;
   return `<article class="offer ${tcls(o.tier)} ${o.locked ? 'locked' : ''} ${a.merge ? 'merge' : ''} ${a.blocked ? 'blocked' : ''}">
     <kbd class="num">${i + 1}</kbd>
     ${ribbons ? `<div class="ribbons">${ribbons}</div>` : ''}
@@ -309,7 +323,7 @@ export function offerCard(o, i, me) {
     ${a.hint ? `<div class="mergenote">${esc(a.hint)}</div>` : ''}${set}
     <div class="buyrow">
       <button class="buy ${state}" data-act="buy" data-slot="${i}"${need}>${a.blocked && a.ribbons[0] ? `<span>${esc(a.ribbons[0].text)}</span>` : `Buy ${AMBER} ${o.price}`}</button>
-      <button class="lock ${o.locked ? 'on' : ''}" data-act="lock" data-slot="${i}" aria-pressed="${!!o.locked}" title="Lock: keep this offer through rerolls and into the next wave at today's price">${o.locked ? ICON.lock : ICON.unlock}<span>${o.locked ? 'Locked' : 'Lock'}</span></button>
+      <button class="lock ${o.locked ? 'on' : ''}" data-act="lock" data-slot="${i}"${tipAttr('lock')} aria-pressed="${!!o.locked}" data-tip-text="Lock: keep this offer through rerolls and into the next wave at today's price">${o.locked ? ICON.lock : ICON.unlock}<span>${o.locked ? 'Locked' : 'Lock'}</span></button>
     </div>
   </article>`;
 }
@@ -317,7 +331,7 @@ export function offerCard(o, i, me) {
 // ---- Your build ------------------------------------------------------------------------------------------------
 
 function buildHtml(me, now) {
-  const maxW = BALANCE.shop.maxWeapons;
+  const maxW = maxWeaponsOf(me.char);
   const counts = classCounts({ weapons: me.weapons });
   const bonuses = activeClassBonuses({ weapons: me.weapons });
   const pairs = new Set();
@@ -332,7 +346,7 @@ function buildHtml(me, now) {
   const items = itemIds.map((id) => itemTile(id, itemCounts[id])).join('');
   const xpPct = Math.max(0, Math.min(100, ((me.xp || 0) / Math.max(1, me.xpNext || 1)) * 100));
   return `<div class="bhead"><h3>Weapons <span>${me.weapons.length}/${maxW}</span></h3>
-      <div class="xp" title="${fmt(me.xp)} / ${me.xpNext} XP to the next level"><b>LV ${me.level}</b><i class="bar"><u style="width:${xpPct.toFixed(1)}%"></u></i></div></div>
+      <div class="xp"${tipAttr('xp')} data-tip-text="${fmt(me.xp)} / ${me.xpNext} XP to the next level"><b>LV ${me.level}</b><i class="bar"><u style="width:${xpPct.toFixed(1)}%"></u></i></div></div>
     <div class="weapons">${rows}</div>
     ${sets ? `<h3>Set bonuses</h3><div class="sets">${sets}</div>` : ''}
     <h3>Items <span>${me.items.length}</span></h3>
@@ -353,8 +367,8 @@ function weaponRow(w, me, isPair) {
     <div class="ico"><img src="${SPR(`w_${w.wid}`)}" ${IMG_ERR} alt=""><span class="rom">${ROMAN[w.tier - 1]}</span></div>
     <div class="wt"><b>${esc(d?.name || w.wid)}</b><span>${esc(weaponClass(w.wid))} · ${st ? `${fmt(st.dmg)} dmg · ${fmt(st.dps)} DPS` : ''}</span></div>
     <div class="wb">
-      ${isPair ? `<button class="mini merge" data-act="merge" data-uid="${w.uid}" title="Merge two identical weapons into tier ${ROMAN[w.tier]}">Merge → ${ROMAN[w.tier]}</button>` : ''}
-      <button class="mini sell ${only ? 'off' : ''}" data-act="sell" data-uid="${w.uid}" title="${only ? 'Keep at least one weapon' : `Sell for ${sell} amber (25% of its price)`}">Sell ${AMBER} +${sell}</button>
+      ${isPair ? `<button class="mini merge" data-act="merge" data-uid="${w.uid}"${tipAttr('merge')} data-tip-text="Merge two identical weapons into tier ${ROMAN[w.tier]}">Merge → ${ROMAN[w.tier]}</button>` : ''}
+      <button class="mini sell ${only ? 'off' : ''}" data-act="sell" data-uid="${w.uid}"${tipAttr('sell')} data-tip-text="${only ? 'Keep at least one weapon' : `Sell for ${sell} amber (25% of its price)`}">Sell ${AMBER} +${sell}</button>
     </div>
   </div>`;
 }
@@ -397,7 +411,7 @@ function statsHtml(me, now) {
     const popStyle = popCls ? ` style="animation-delay:-${Math.round(age)}ms"` : '';
     const tone = val > base + 1e-6 ? 'good' : val < base - 1e-6 ? 'bad' : '';
     const label = (STAT_LABELS[k] || k).replace(/\s*%$/, '');
-    return `<div><span>${esc(label)}</span><b class="${tone}${popCls}"${popStyle}>${esc(statValue(k, val))}</b>${delta}</div>`;
+    return `<div${tipAttr(k)}><span>${esc(label)}</span><b class="${tone}${popCls}"${popStyle}>${esc(statValue(k, val))}</b>${delta}</div>`;
   }).join('');
 }
 

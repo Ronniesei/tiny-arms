@@ -9,8 +9,8 @@ export const BALANCE = {
     radius: 22,
     speed: 300,            // px/s at 0% Speed
     minSpeedPct: -60,      // Speed stat floor
-    iframesMin: 0.2,       // s, after a small hit
-    iframesMax: 0.45,      // s, after a hit costing >= iframesHitPct of max HP
+    iframesMin: 0.15,      // s, after a small hit (owner 18 Oct: running through hordes was too safe)
+    iframesMax: 0.3,       // s, after a hit costing >= iframesHitPct of max HP
     iframesHitPct: 0.15,
     pickupRadius: 90,      // px at 0% Pickup Range
     weaponOrbit: 38,       // px from body centre to weapon

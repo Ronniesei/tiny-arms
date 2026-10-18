@@ -33,7 +33,7 @@ export function grantXp(w, p, xp) {
  */
 export function awardAmber(w, p, v, x, y, o = {}) {
   let total = v;
-  const bonus = o.bonus === false ? 0 : p.specials?.amberBonus || 0;
+  const bonus = o.bonus === false ? 0 : (p.specials?.amberBonus || 0) + (p.stats?.heroAmber || 0); // Ancient Amber + Goldie's Golden Touch
   if (bonus > 0) {
     p.amberAcc = (p.amberAcc || 0) + v * bonus;
     const extra = Math.floor(p.amberAcc + 1e-9);
@@ -42,7 +42,7 @@ export function awardAmber(w, p, v, x, y, o = {}) {
   }
   p.amber += total;
   p.score.amber += total;
-  if (p.specials?.hoard > 0) refreshHoard(p); // Hoard Heart: more amber, more damage
+  if (p.specials?.hoard > 0 || p.stats?.hoardPer > 0) refreshHoard(p); // Hoard Heart / Golden Touch: more amber, more damage
   if (o.xp !== false) grantXp(w, p, v * BALANCE.economy.xpPerAmber);
   if (!o.quiet) emit(w, { type: 'pickup', pid: p.id, kind: 'amber', v: total, x: Math.round(x), y: Math.round(y) });
   return total;

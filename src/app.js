@@ -7,6 +7,7 @@ import { ClientSession } from './net/client.js';
 import { makeRoomCode } from './net/transport.js';
 import { Keyboard } from './input.js';
 import { botInput, botShopOp, createBotState } from './sim/bot.js';
+import { isUnlocked, recordRun, runFromResult } from './meta/unlocks.js';
 
 const SETTINGS_KEY = 'tinyarms.settings';
 
@@ -21,6 +22,7 @@ export class App {
     this.listeners = [];
     this.bot = params.bot ? createBotState() : null;
     this.botShopT = 0;
+    this.runRecorded = false;   // this run's numbers are already in the unlock progress (trackRun)
     this.settings = loadSettings();
   }
 
@@ -28,10 +30,15 @@ export class App {
 
   // ---- sessions ----
 
+  /** A hero this browser has not unlocked cannot be played: fall back to Spike (the default). */
+  resolveChar(char) {
+    return char && isUnlocked(char) ? char : 'spike';
+  }
+
   async startSolo({ char, autoStart = false } = {}) {
     this.endSession();
     const s = new HostSession({
-      code: 'SOLO', name: this.settings.name, char: char || this.params.char || this.settings.char,
+      code: 'SOLO', name: this.settings.name, char: this.resolveChar(char || this.params.char || this.settings.char),
       solo: true, speed: this.params.speed, seed: this.params.seed, startWave: this.params.wave,
     });
     this.session = s;
@@ -43,7 +50,7 @@ export class App {
   async host(code) {
     this.endSession();
     const s = new HostSession({
-      code: code || makeRoomCode(), name: this.settings.name, char: this.params.char || this.settings.char,
+      code: code || makeRoomCode(), name: this.settings.name, char: this.resolveChar(this.params.char || this.settings.char),
       local: this.params.local, speed: this.params.speed, seed: this.params.seed, startWave: this.params.wave,
     });
     this.session = s;
@@ -53,7 +60,7 @@ export class App {
 
   async join(code) {
     this.endSession();
-    const s = new ClientSession({ code: code.toUpperCase().trim(), name: this.settings.name, char: this.params.char || this.settings.char, local: this.params.local });
+    const s = new ClientSession({ code: code.toUpperCase().trim(), name: this.settings.name, char: this.resolveChar(this.params.char || this.settings.char), local: this.params.local });
     this.session = s;
     await s.open();
     return s;
@@ -93,6 +100,7 @@ export class App {
         // Solo runs pause while the settings panel is open (co-op can't pause for everyone).
         if (!(s.solo && this.ui?.settingsOpen)) s.update(dt);
         if (this.bot) this.botShop(s, dt);
+        this.trackRun(s);
       } catch (e) {
         this.recordError(e);
       }
@@ -119,6 +127,23 @@ export class App {
     const op = botShopOp(me);
     if (op) s.shopOp(op);
     else if (!me.ready) s.shopOp({ op: 'ready', value: true });
+  }
+
+  /**
+   * Once per run, when it ends: put this browser's own player into the unlock progress (src/meta/unlocks.js).
+   * Host and solo read the scoreboard; a joiner reads session.me().result (it arrives a moment after the phase flips to
+   * 'end') and takes their own row by myId. Leaving the 'end' phase re-arms it for the next run.
+   */
+  trackRun(s) {
+    if (s.phase() !== 'end') { this.runRecorded = false; return; }
+    if (this.runRecorded) return;
+    const res = s.me()?.result || s.world?.result;
+    if (!res) return;
+    this.runRecorded = true;
+    try {
+      const run = runFromResult(res, s.myId);
+      if (run) recordRun(run);
+    } catch (e) { this.recordError(e); }
   }
 
   recordError(e) {

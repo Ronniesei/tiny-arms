@@ -7,6 +7,7 @@
 export const SPRITES = {
   // Heroes (viewBox 128)
   h_brutus: [72, 0x3f7d3a, 'rex'], h_fern: [64, 0x8fd16a, 'rex'], h_spike: [64, 0xf08a24, 'rex'], h_sparky: [64, 0x6b6fe0, 'rex'],
+  h_pip: [64, 0xf06aa0, 'rex'], h_goldie: [64, 0xe8b830, 'rex'], h_bolt: [64, 0x2fb5a8, 'rex'], h_ash: [64, 0x5a4a52, 'rex'],
   // Enemies (small viewBox 64, big 192, boss 256)
   e_raptor: [60, 0xa8432a, 'blob'], e_spitter: [64, 0x7c8a3a, 'blob'], e_caveman: [64, 0xc9a26b, 'blob'],
   e_mosquito: [34, 0x5a2a4a, 'blob'], e_ptero: [72, 0x7a6a8a, 'blob'], e_ankylo: [104, 0x8a8a84, 'blob'],

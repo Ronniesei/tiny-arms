@@ -87,12 +87,21 @@ export function resetFrenzy(player) {
   if (player.stats) player.stats.frenzyAs = 0;
 }
 
-/** Hoard Heart: +pct% damage per `per` amber held (max `max`%). Dynamic, so it is refreshed whenever amber changes. */
+/**
+ * Damage % from the amber held. Dynamic, so it is refreshed whenever amber changes.
+ * Hoard Heart: +pct% per `per` amber (max `max`%). Goldie's Golden Touch trait: +hoardPct% per hoardPer amber (max hoardMax%).
+ */
 export function hoardBonus(player) {
+  const amber = player.amber || 0;
+  let b = 0;
   const h = player.specials?.hoard || 0;
-  if (!(h > 0)) return 0;
-  const R = SPECIAL_RULES.hoard;
-  return Math.min(R.max, Math.floor((player.amber || 0) / R.per) * R.pct * h);
+  if (h > 0) {
+    const R = SPECIAL_RULES.hoard;
+    b += Math.min(R.max, Math.floor(amber / R.per) * R.pct * h);
+  }
+  const s = player.stats;
+  if (s && s.hoardPer > 0) b += Math.min(s.hoardMax, Math.floor(amber / s.hoardPer) * s.hoardPct);
+  return b;
 }
 
 /** Update stats.hoardDmg after amber changed (cheap; call from anything that adds or spends amber). */
@@ -124,10 +133,21 @@ export function recomputeStats(player) {
   s.frenzyAs = frenzyBonus(t, player.frenzy);
   // Item damage multipliers the weapons read (weaponDamage): Twin Quiver, Pack Leader, Lucky Strike.
   s.rangedItemMult = Math.max(SPECIAL_RULES.twinQuiver.minMult, 1 + sp.rangedMult);
-  s.summonMult = 1 + sp.summonDmg;
   s.ownMult = Math.max(0.1, 1 + sp.ownDmg);
   s.critMultAdd = sp.critMult;
   s.berserkAs = 0;                                          // movement.js sets this every tick (Berserker Sap)
+  // New heroes' traits (see `trait` in src/data/characters.js).
+  s.heroDmgMult = t?.weaponDmg ?? 1;                        // Pip's Lone Arm: x damage on the one weapon
+  if (t?.weaponAs) s.attackSpeed += t.weaponAs;             // ...and its attack speed bonus (shows up in the stats panel)
+  s.heroSummonMult = t?.summonDmg ?? 1;                     // Bolt's Workshop (shown on the weapon card)
+  s.summonMult = (1 + sp.summonDmg) * s.heroSummonMult;     // ...and it stacks with Pack Leader
+  s.extraSummons = t?.extraSummons ?? 0;                    // Bolt: +1 turret / drone per summon weapon
+  s.heroAmber = t?.amberBonus ?? 0;                         // Goldie: more amber from pickups
+  s.hoardPer = t?.hoardPer ?? 0; s.hoardPct = t?.hoardPct ?? 0; s.hoardMax = t?.hoardMax ?? 0; // Goldie: damage from amber held
+  s.kindle = t?.kindleChance ?? 0;                          // Ash: chance a hit ignites (hooks.js onHit)
+  s.kindleDps = t?.kindleDps ?? 0; s.kindleTime = t?.kindleTime ?? 0;
+  s.burnMult = t?.burnMult ?? 1;                            // Ash: burn damage (damage.js hitEnemy)
+  s.abilityAs = player.abState?.as || 0;                    // Overdrive: attack speed while it runs (abilities.js keeps it fresh)
   const prevMax = player.stats.maxHp;
   player.stats = s;
   player.specials = sp;
@@ -169,7 +189,7 @@ export function weaponRange(def, stats) {
 }
 
 export function weaponCooldown(def, tier, stats) {
-  const as = Math.max(BALANCE.stat.minAttackSpeed, stats.attackSpeed + (stats.frenzyAs || 0) + (stats.berserkAs || 0));
+  const as = Math.max(BALANCE.stat.minAttackSpeed, stats.attackSpeed + (stats.frenzyAs || 0) + (stats.berserkAs || 0) + (stats.abilityAs || 0));
   return def.cooldown[tier - 1] / (1 + as / 100);
 }
 
@@ -178,8 +198,14 @@ export function weaponDamage(def, tier, stats) {
   if (def.scaling) for (const k in def.scaling) d += def.scaling[k] * (stats[k] || 0);
   d *= 1 + (stats.damage + (stats.hoardDmg || 0)) / 100;
   d *= def.kind === 'melee' ? (stats.meleeMult ?? 1) : (stats.rangedMult ?? 1) * (stats.rangedItemMult ?? 1); // Brutus's Thick Skull, Twin Quiver
-  d *= def.behaviour === 'drone' || def.behaviour === 'turret' ? (stats.summonMult ?? 1) : (stats.ownMult ?? 1); // Pack Leader
+  d *= def.behaviour === 'drone' || def.behaviour === 'turret' ? (stats.summonMult ?? 1) : (stats.ownMult ?? 1); // Pack Leader, Bolt's Workshop
+  d *= stats.heroDmgMult ?? 1; // Pip's Lone Arm
   return Math.max(1, d);
+}
+
+/** Weapon slots a hero has: Pip's Lone Arm trait gives 1, everyone else BALANCE.shop.maxWeapons. */
+export function maxWeaponsOf(char) {
+  return CHARACTERS[char]?.trait?.maxWeapons ?? BALANCE.shop.maxWeapons;
 }
 
 /** Mana cost of an ability after item discounts (Thunder Egg). Use this wherever an ability is paid for. */

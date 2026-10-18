@@ -7,6 +7,8 @@ import { DANGER } from '../data/danger.js';
 import { ITEMS } from '../data/items.js';
 import { WEAPONS } from '../data/weapons.js';
 import { PLAYER_COLORS_CSS } from '../render/art.js';
+import { lastNewlyUnlocked } from '../meta/unlocks.js';
+import { tip } from './tips.js';
 import { ROMAN, TIER_CLASS, TIER_NAMES, esc } from './describe.js';
 
 const SPR = (key) => `assets/sprites/${key}.svg`;
@@ -24,13 +26,13 @@ const tier = (t) => Math.max(1, Math.min(4, n(t) || 1));
 
 /** [row key, column heading, what it measures (tooltip)] */
 const COLUMNS = [
-  ['kills', 'Kills', 'Enemies defeated'],
-  ['damageDealt', 'Damage', 'Damage dealt'],
-  ['damageTaken', 'Taken', 'Damage taken'],
-  ['revives', 'Revives', 'Mates brought back up'],
-  ['healing', 'Healed mates', 'HP healed on mates (self-healing not counted)'],
-  ['amber', 'Amber', 'Amber collected'],
-  ['casts', 'Casts', 'Abilities cast'],
+  ['kills', 'Kills', 'Kills: enemies this player defeated, including kills made by burns, turrets and abilities.'],
+  ['damageDealt', 'Damage', 'Damage: all the damage this player dealt, from weapons, abilities and burns.'],
+  ['damageTaken', 'Taken', 'Taken: damage this player took from enemies, after armor. The Tank title goes to the highest.'],
+  ['revives', 'Revives', 'Revives: how many times this player brought a downed mate back up.'],
+  ['healing', 'Healed mates', 'Healed mates: HP this player restored on other players (healing yourself is not counted).'],
+  ['amber', 'Amber', 'Amber: amber this player collected, bonuses and Harvesting included. Amber is also what you spend in the shop.'],
+  ['casts', 'Casts', 'Casts: how many times this player used their Space ability.'],
 ];
 
 /** One weapon chip: icon with its tier numeral, the damage it dealt and a bar showing its share of the player's total. */
@@ -39,8 +41,8 @@ function weaponChip(x, total, star) {
   const t = tier(x.tier);
   const pct = total > 0 ? Math.min(100, Math.round((n(x.dmg) / total) * 100)) : 0;
   const name = d?.name || x.wid;
-  const tip = `${name} ${ROMAN[t - 1]} (${TIER_NAMES[t - 1]}): ${fmt(x.dmg)} damage${total > 0 ? `, ${pct}% of this player's total` : ''}${x.gone ? '. Sold or merged away earlier in the run.' : ''}`;
-  return `<div class="wchip ${TIER_CLASS[t - 1]}${x.gone ? ' gone' : ''}${star ? ' top' : ''}" title="${esc(tip)}">
+  const text = `${name} ${ROMAN[t - 1]} (${TIER_NAMES[t - 1]}): ${fmt(x.dmg)} damage${total > 0 ? `, ${pct}% of this player's total` : ''}${x.gone ? '. Sold or merged away earlier in the run.' : ''}`;
+  return `<div class="wchip ${TIER_CLASS[t - 1]}${x.gone ? ' gone' : ''}${star ? ' top' : ''}" data-tip-text="${esc(text)}">
       <div class="wi"><img src="${SPR(`w_${x.wid}`)}" ${IMG_ERR} alt=""><span class="rom">${ROMAN[t - 1]}</span></div>
       <b>${short(x.dmg)}</b><i class="share" style="--s:${pct}%"></i>
     </div>`;
@@ -54,7 +56,7 @@ function itemTiles(ids) {
     .sort((a, b) => (ITEMS[b].tier || 1) - (ITEMS[a].tier || 1) || ITEMS[a].name.localeCompare(ITEMS[b].name));
   return list.map((id) => {
     const it = ITEMS[id], c = counts.get(id), t = tier(it.tier);
-    return `<div class="bitem ${TIER_CLASS[t - 1]}" title="${esc(`${it.name}${c > 1 ? ` x${c}` : ''}`)}"><img src="${SPR(it.icon || 'amber')}" ${IMG_ERR} alt="">${c > 1 ? `<i>x${c}</i>` : ''}</div>`;
+    return `<div class="bitem ${TIER_CLASS[t - 1]}" data-tip-text="${esc(`${it.name}${c > 1 ? ` x${c}` : ''}${it.desc ? `: ${it.desc}` : ''}`)}"><img src="${SPR(it.icon || 'amber')}" ${IMG_ERR} alt="">${c > 1 ? `<i>x${c}</i>` : ''}</div>`;
   }).join('');
 }
 
@@ -71,7 +73,7 @@ function buildsHtml(rows) {
     const other = total - wsum;           // abilities and anything else that is not a weapon
     const chips = bw.map((x) => weaponChip(x, total, x === best)).join('')
       + (other >= Math.max(1, total * 0.02)
-        ? `<div class="wchip other" title="${esc(`Abilities and other damage: ${fmt(other)}`)}"><div class="wi"><span class="spark">&#10022;</span></div><b>${short(other)}</b><i class="share" style="--s:${Math.min(100, Math.round((other / total) * 100))}%"></i></div>`
+        ? `<div class="wchip other" data-tip-text="${esc(`Abilities and other damage: ${fmt(other)}. Damage that did not come from a weapon, like your Space ability.`)}"><div class="wi"><span class="spark">&#10022;</span></div><b>${short(other)}</b><i class="share" style="--s:${Math.min(100, Math.round((other / total) * 100))}%"></i></div>`
         : '');
     const items = itemTiles(r.items);
     const col = PLAYER_COLORS_CSS[r.pid % 4];
@@ -82,6 +84,19 @@ function buildsHtml(rows) {
     </div>`;
   }).join('');
   return `<div class="builds" style="--n:${rows.length}"><h3>Builds <small>damage dealt by each weapon</small></h3>${cards}</div>`;
+}
+
+/** "NEW HERO UNLOCKED: Pip!" for every hero this browser's last recorded run unlocked (src/meta/unlocks.js, app.js trackRun). */
+export function unlockPanels() {
+  return lastNewlyUnlocked().filter((id) => CHARACTERS[id]).map((id) => {
+    const c = CHARACTERS[id];
+    return `<div class="unlocked" style="--hc:${c.color}" role="status" data-tip-text="${esc(`${c.name} is now unlocked in this browser. Pick ${c.name} in the lobby for your next run.`)}">
+      <span class="uport"><img src="${SPR(`h_${id}`)}" ${IMG_ERR} alt=""></span>
+      <div class="utext"><b class="uline"><span class="ukick">NEW HERO UNLOCKED:</span> <span class="uname">${esc(c.name)}!</span></b>
+        <small>${esc(c.role)} · ${esc(c.trait?.name || '')}: ${esc(c.trait?.desc || c.blurb)}</small>
+        <small class="uhint">${esc(c.name)} is waiting in the lobby for your next run.</small></div>
+    </div>`;
+  }).join('');
 }
 
 export function endScreen(ui) {
@@ -98,7 +113,7 @@ export function endScreen(ui) {
   for (const [k] of COLUMNS) best[k] = multi ? Math.max(...rows.map((r) => n(r[k]))) : 0;
 
   const titleList = (pid) => titles.filter((t) => t.pid === pid)
-    .map((t) => `<li title="${esc(t.desc || '')}"><span class="badge">${esc(t.name)}</span><span class="cap">${esc(t.cap || t.desc || '')}</span></li>`).join('');
+    .map((t) => `<li data-tip-text="${esc(t.desc || '')}"><span class="badge">${esc(t.name)}</span><span class="cap">${esc(t.cap || t.desc || '')}</span></li>`).join('');
 
   const body = rows.map((r, i) => `<tr style="--pc:${PLAYER_COLORS_CSS[r.pid % 4]};--i:${i}">
       <td class="who"><div class="id"><img src="${SPR(`h_${r.char}`)}" alt=""><div><b>${esc(r.name)}</b><small>${esc(CHARACTERS[r.char]?.name || '')}</small></div></div>
@@ -115,9 +130,10 @@ export function endScreen(ui) {
       <p class="tag">${res.win ? `The herd survived all ${total} waves.` : `The herd fell on wave ${n(res.wave)}.`}</p>
       <span class="wavepill">Wave ${n(res.wave)} / ${total}</span>${res.danger !== undefined ? `<span class="wavepill">${esc(DANGER[res.danger]?.name || '')}</span>` : ''}
     </div>
+    ${unlockPanels()}
     <div class="escroll">
       <table class="score">
-        <thead><tr><th></th>${COLUMNS.map(([, label, tip]) => `<th title="${esc(tip)}">${label}</th>`).join('')}</tr></thead>
+        <thead><tr><th data-tip-text="Each player, their hero and the titles they earned.&#10;A star marks the best number in a column."></th>${COLUMNS.map(([, label, hint]) => `<th data-tip-text="${esc(hint)}">${label}</th>`).join('')}</tr></thead>
         <tbody>${body}</tbody>
       </table>
       ${team ? `<p class="teamline">${team}</p>` : ''}

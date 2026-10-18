@@ -40,3 +40,12 @@ input:focus { border-color: var(--amber); }
 .modal { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; pointer-events: auto !important; }
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(30px); background: var(--dark); border: 3px solid var(--amber); border-radius: 14px; padding: 10px 20px; font-size: 18px; opacity: 0; transition: .2s; pointer-events: none; z-index: 10; }
 #toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* Hover explanations (src/ui/tips.js) */
+#tip { position: fixed; z-index: 50; max-width: 320px; padding: 10px 12px; background: var(--dark); color: var(--cream); border: 3px solid var(--amber); border-radius: 12px; box-shadow: 0 6px 0 #140e0a, 0 10px 24px rgba(0,0,0,.45); font-size: 15px; line-height: 1.35; pointer-events: none; opacity: 0; transition: opacity .08s; }
+#tip.show { opacity: 1; }
+#tip b { display: block; color: var(--amber); font-size: 16px; margin-bottom: 4px; }
+#tip p { margin: 0 0 4px; } #tip p:last-child { margin-bottom: 0; }
+[data-gloss] { cursor: help; }
+button[data-gloss], [data-act][data-gloss] { cursor: pointer; }
+#hudtips > div { position: fixed; z-index: 5; }

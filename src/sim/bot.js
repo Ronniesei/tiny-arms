@@ -9,6 +9,7 @@ import { CHARACTERS } from '../data/characters.js';
 import { ENEMIES } from '../data/enemies.js';
 import { WEAPONS } from '../data/weapons.js';
 import { ITEMS } from '../data/items.js';
+import { maxWeaponsOf } from './stats.js';
 
 const AW = BALANCE.arena.w, AH = BALANCE.arena.h;
 
@@ -159,12 +160,17 @@ export function botInput(src, pid, bs, time, opt = {}) {
   const cost = me.abCost ?? ab?.cost ?? 999;
   if (ab && me.mana >= cost && !(me.abCd > 0)) {
     let want = false;
+    let amberLoose = 0;
+    if (ab.id === 'gold_rush') for (const pk of src.pickups) if (pk.kind === 'amber') amberLoose++;
     if (ab.id === 'healing_pulse') want = hpFrac < 0.6 || !!downedAlly || close >= 4;
     else if (ab.id === 'meteor_call') want = src.enemies.length >= 6;
+    else if (ab.id === 'overdrive') want = close >= 2 || nd < 180;           // a buff: use it when a fight is on
+    else if (ab.id === 'overclock') want = src.enemies.length >= 5;
+    else if (ab.id === 'gold_rush') want = amberLoose >= 6;                   // only worth it with amber on the floor
     else want = close >= 3;
     // Don't sit on full mana: a person spends it whenever something is in reach.
     const full = me.mana >= (me.maxMana ?? me.stats?.maxMana ?? 100) * 0.9;
-    if (full && (close >= 1 || nd < 260)) want = true;
+    if (full && (close >= 1 || nd < 260) && (ab.id !== 'gold_rush' || amberLoose >= 3)) want = true;
     if (want && skill > 0.3) bs.ab++;
   }
 
@@ -183,6 +189,10 @@ const STAT_PRIORITY = {
   fern: ['hpRegen', 'maxHp', 'rangedDamage', 'abilityPower', 'armor', 'attackSpeed', 'manaRegen'],
   spike: ['damage', 'attackSpeed', 'meleeDamage', 'maxHp', 'lifeSteal', 'critChance', 'armor'],
   sparky: ['rangedDamage', 'maxHp', 'abilityPower', 'armor', 'attackSpeed', 'damage', 'manaRegen'],
+  pip: ['attackSpeed', 'damage', 'meleeDamage', 'critChance', 'maxHp', 'armor', 'lifeSteal'],     // one weapon: make it hit and swing more
+  goldie: ['harvesting', 'rangedDamage', 'maxHp', 'attackSpeed', 'armor', 'luck', 'damage'],      // amber in, damage out
+  bolt: ['rangedDamage', 'abilityPower', 'attackSpeed', 'maxHp', 'armor', 'damage', 'manaRegen'], // summons scale with these
+  ash: ['abilityPower', 'rangedDamage', 'maxHp', 'armor', 'attackSpeed', 'damage', 'critChance'],  // burn scales with Ability Power
 };
 
 function itemScore(me, id) {
@@ -211,8 +221,9 @@ function weaponScore(me, id, tier) {
   const cls = me.weapons.map((x) => WEAPONS[x.wid]?.cls);
   if (cls.includes(def.cls)) s += 1.5;
   // Early on, every extra weapon is a big damage jump: fill the slots like a person would.
-  if (me.weapons.length < 4) s += 4;
-  else if (me.weapons.length < BALANCE.shop.maxWeapons) s += 2;
+  const maxW = maxWeaponsOf(me.char);
+  if (me.weapons.length < Math.min(4, maxW)) s += 4;
+  else if (me.weapons.length < maxW) s += 2;
   return s;
 }
 
@@ -239,11 +250,14 @@ export function botShopOp(me, opt = {}) {
   }
   const offers = me.shop?.offers || [];
   const affordable = offers.map((o, slot) => ({ o, slot })).filter(({ o }) => o && o.price <= me.amber);
-  const canTake = (o) => o.kind === 'item' || me.weapons.length < BALANCE.shop.maxWeapons
-    || me.weapons.some((x) => x.wid === o.id && x.tier === o.tier && o.tier < 4);
+  const maxW = maxWeaponsOf(me.char);
+  // A hero with one weapon slot (Pip) merges duplicates, or swaps to a weapon of a higher tier (the shop pays out the old one).
+  const canTake = (o) => o.kind === 'item' || me.weapons.length < maxW
+    || me.weapons.some((x) => x.wid === o.id && x.tier === o.tier && o.tier < 4)
+    || (maxW === 1 && me.weapons.length === 1 && o.tier > me.weapons[0].tier);
   const options = affordable.filter(({ o }) => canTake(o));
   // Save (and lock) for weapons until we have three: an extra weapon beats any early item.
-  if (!opt.random && me.weapons.length < 3) {
+  if (!opt.random && me.weapons.length < Math.min(3, maxW)) {
     const fits = (o) => me.char !== 'brutus' || WEAPONS[o.id]?.kind === 'melee'; // Brutus's trait punishes ranged
     const wo = offers.map((o, slot) => ({ o, slot })).filter(({ o }) => o && o.kind === 'weapon' && canTake(o) && fits(o));
     if (wo.length) {

@@ -5,12 +5,14 @@
 //   (?solo=1, ?bot=1 and ?wave=N each skip the menu and lobby and start a solo run; ?danger=N picks the danger level,
 //    default 1 Normal for those auto-started runs and the lobby's remembered choice otherwise)
 //   ?host=1&room=TEST1   ?join=TEST1   &local=1 (BroadcastChannel instead of PeerJS, same browser only)
+//   ?unlockall=1  every hero is pickable (progress is still recorded; heroes are normally unlocked in src/meta/unlocks.js)
 
 import { App } from './app.js';
 import { BootScene } from './render/BootScene.js';
 import { GameScene } from './render/GameScene.js';
 import { UI } from './ui/ui.js';
 import { clampDanger, DEFAULT_DANGER } from './data/danger.js';
+import * as unlocks from './meta/unlocks.js';
 
 const q = new URLSearchParams(location.search);
 const params = {
@@ -28,6 +30,7 @@ const params = {
   local: q.get('local') === '1',
 };
 
+if (q.get('unlockall') === '1') unlocks.setUnlockAll(true);
 const app = new App(params);
 
 addEventListener('error', (e) => app.recordError(e.error || e.message));
@@ -93,4 +96,5 @@ window.__game = {
   skipToShop: () => app.session?.skipToShop(),
   skipWave: () => app.session?.skipWave(),
   world: () => app.session?.world || null,
+  unlocks,
 };

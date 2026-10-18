@@ -4,6 +4,8 @@
 
 import { sfx } from '../audio/sfx.js';
 import { esc } from './describe.js';
+import { installTips } from './tips.js';
+import { HudTips } from './hudtips.js';
 import { menuScreen, settingsModal, menuActions } from './menu.js';
 import { lobbyScreen, lobbyActions } from './lobby.js';
 import { shopScreen, shopActions } from './shop.js';
@@ -25,7 +27,9 @@ export class UI {
     root.addEventListener('input', (e) => this.onInput(e));
     root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'code') this.act('join'); });
     app.keys.onEscape = () => { this.settingsOpen = !this.settingsOpen; this.key = ''; };
-    app.onFrame(() => this.update());
+    this.hudTips = new HudTips(app);
+    app.onFrame(() => { this.update(); this.hudTips.update(this.screen === 'game'); });
+    installTips();
     sfx.setVolume(app.settings.volume);
   }
 

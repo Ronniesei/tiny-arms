@@ -16,14 +16,14 @@ export const ENEMIES = {
   // Fast chaser, low HP, comes in packs.
   raptor: {
     id: 'raptor', name: 'Raptor', ai: 'chase', sprite: 'e_raptor', size: 64, radius: 18,
-    hp: 4.2, hpPerWave: 1.65, speed: 210, dmg: 1, dmgPerWave: 0.625, amber: 1, kbResist: 0,
+    hp: 4.2, hpPerWave: 1.65, speed: 210, dmg: 2, dmgPerWave: 0.8, amber: 1, kbResist: 0,
     group: [3, 5], pack: true, spread: 90, speedJitter: 0.08,
   },
 
   // Medium. Walks up, raises its club (line telegraph), then charges along the line.
   caveman: {
     id: 'caveman', name: 'Caveman', ai: 'caveman', sprite: 'e_caveman', size: 64, radius: 22,
-    hp: 10.2, hpPerWave: 3.45, speed: 105, dmg: 1, dmgPerWave: 0.25, amber: 1.5, kbResist: 0.1,
+    hp: 10.2, hpPerWave: 3.45, speed: 105, dmg: 2, dmgPerWave: 0.4, amber: 1.5, kbResist: 0.1,
     group: [1, 2], initCd: [0.3, 1.0],
     chargeDmg: 3.5, chargeDmgPerWave: 0.875,
     triggerRange: 320, windup: 0.6, lockFrac: 0.55, chargeSpeed: 720, chargeDur: 0.5, recover: 0.55, attackCd: 3.0, wallDaze: 0.8,
@@ -32,7 +32,7 @@ export const ENEMIES = {
   // Tiny, very low HP, spawns as a cloud of 8-12 that drifts toward players with wobbly movement.
   mosquito: {
     id: 'mosquito', name: 'Mosquito', ai: 'swarm', sprite: 'e_mosquito', size: 34, radius: 9,
-    hp: 1.7, hpPerWave: 0.49, speed: 125, dmg: 1, dmgPerWave: 0.15, amber: 0.4, kbResist: 0, mass: 0.4,
+    hp: 1.7, hpPerWave: 0.49, speed: 125, dmg: 1, dmgPerWave: 0.25, amber: 0.4, kbResist: 0, mass: 0.4,
     group: [8, 12], pack: true, spread: 70,
     wobble: 0.95, wobbleFreq: 3.2,
   },
@@ -40,7 +40,7 @@ export const ENEMIES = {
   // Keeps its distance, flares for 0.5 s, then spits a slow magenta shot.
   spitter: {
     id: 'spitter', name: 'Spitter', ai: 'spitter', sprite: 'e_spitter', size: 64, radius: 20,
-    hp: 7.6, hpPerWave: 2.25, speed: 150, dmg: 1, dmgPerWave: 0.312, amber: 1, kbResist: 0.2,
+    hp: 7.6, hpPerWave: 2.25, speed: 150, dmg: 2, dmgPerWave: 0.45, amber: 1, kbResist: 0.2,
     group: [1, 2], initCd: [0.4, 2.0],
     keepDist: 340, attackRange: 560, windup: 0.5, attackCd: 2.6,
     shotSpeed: 240, shotDmg: 2, shotDmgPerWave: 0.438, shotRadius: 10,
@@ -59,7 +59,7 @@ export const ENEMIES = {
   // Slow and tanky. When a player is close it winds up (circle telegraph) and tail-swings everything inside.
   ankylo: {
     id: 'ankylo', name: 'Ankylosaurus', ai: 'ankylo', sprite: 'e_ankylo', size: 104, radius: 40,
-    hp: 51, hpPerWave: 10.5, speed: 62, dmg: 2, dmgPerWave: 0.312, amber: 3, kbResist: 0.85, mass: 6,
+    hp: 51, hpPerWave: 10.5, speed: 62, dmg: 3, dmgPerWave: 0.5, amber: 3, kbResist: 0.85, mass: 6,
     group: [1, 1], initCd: [0, 0.5],
     swingDmg: 5, swingDmgPerWave: 1,
     triggerRange: 120, swingR: 135, windup: 0.6, recover: 0.6, attackCd: 2.8,

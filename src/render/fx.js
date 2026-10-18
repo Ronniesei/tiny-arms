@@ -135,6 +135,7 @@ export class Fx {
     this.wordFree = [];
     this.shapes = [];
     this.shapePool = [];
+    this.auras = [];             // running Overdrive / Overclock buffs: {pid, col, dur, t, spark, fast}
     this.burn = new Map();       // enemy id -> {x, y, sum, t}: burn ticks are summed into one number
     this._burnCb = (b, id) => this.flushBurn(b, id);
     this.dt = 0.016;
@@ -733,10 +734,76 @@ export class Fx {
         this.shake(0.05);
         break;
       }
+      case 'overdrive': {
+        // Pip: a pink burst of speed lines, then a pulsing ring and sparks around her for as long as the buff runs.
+        this.ring(x, y, col, 14, 110, 0.4, 10);
+        this.ring(x, y, 0xffffff, 8, 70, 0.3, 5, 0.05);
+        this.burst(x, y, col, 24, 130, 0.3, 12, 5);
+        this.spark(x, y, 0xffd0e4, 10);
+        this.word(x, y - 64, 'OVERDRIVE!', col, 28, 0.9);
+        this.shake(0.12);
+        this.addAura(ev.pid, col, ab.duration || 5, true);
+        snd('overdrive');
+        break;
+      }
+      case 'gold_rush': {
+        // Goldie: a big golden shockwave, and sparks flying in from where the amber is.
+        const R = 420;
+        this.ring(x, y, GOLD, 30, R, 0.55, 12);
+        this.ring(x, y, 0xffffff, 20, R * 0.7, 0.45, 5, 0.06);
+        this.disc(x, y, GOLD, 20, R * 0.8, 0.45, 0.28);
+        this.burst(x, y, GOLD, 40, 200, 0.35, 14, 5);
+        this.spark(x, y, GOLD, 12);
+        this.spark(x, y, 0xffffff, 6);
+        for (const pk of v.pickups) if (pk.kind === 'amber' && (pk.x - x) ** 2 + (pk.y - y) ** 2 < 900 * 900) this.glint(pk.x, pk.y, GOLD, 1);
+        this.word(x, y - 64, 'GOLD RUSH!', GOLD, 30, 1);
+        this.shake(0.1);
+        snd('gold_rush');
+        break;
+      }
+      case 'overclock': {
+        // Bolt: electric teal rings and arcs, then a buzzing ring while the buff runs.
+        this.ring(x, y, col, 14, 120, 0.4, 9);
+        this.ring(x, y, 0xffffff, 8, 80, 0.3, 4, 0.06);
+        this.burst(x, y, 0xd8fff8, 20, 140, 0.28, 10, 3, 0.2);
+        this.spark(x, y, col, 10);
+        this.word(x, y - 64, 'OVERCLOCK!', col, 28, 0.9);
+        this.shake(0.1);
+        this.addAura(ev.pid, col, ab.duration || 6, false);
+        snd('overclock');
+        break;
+      }
+      case 'eruption': {
+        // Ash: a ring of fire racing out to the ability's radius, embers and smoke.
+        const R = ab.radius || 170;
+        this.disc(x, y, 0xffa040, R * 0.3, R * 1.05, 0.4, 0.55);
+        this.disc(x, y, 0xffffff, R * 0.15, R * 0.6, 0.2, 0.7);
+        this.ring(x, y, 0xffb627, R * 0.2, R * 1.1, 0.5, 18);
+        this.ring(x, y, 0xff5a1a, R * 0.1, R, 0.45, 12, 0.05);
+        this.ring(x, y, 0xfff4dc, R * 0.1, R * 0.8, 0.3, 5, 0.08);
+        this.burst(x, y, 0xffd36b, R * 0.3, R * 1.1, 0.3, 14, 5);
+        this.puff(x, y, 0xff8a3a, 16);
+        this.puff(x, y, 0x5a4636, 10);
+        for (let i = 0; i < 14; i++) { const a = (i / 14) * TAU; this.ember(x + Math.cos(a) * R * 0.7, y + Math.sin(a) * R * 0.6); }
+        this.spark(x, y, 0xffd36b, 12);
+        this.word(x, y - 64, 'ERUPTION!', 0xffa040, 30, 0.9);
+        this.shake(0.35);
+        this.kick(0.02);
+        snd('eruption');
+        break;
+      }
       default:
         this.ring(x, y, col, 10, 100, 0.4, 8);
         sfx.play(ev.ab);
     }
+  }
+
+  /** Overdrive / Overclock: a pulsing ring and sparks around the caster until the buff ends (replaces one already running). */
+  addAura(pid, col, dur, fast) {
+    const list = this.auras || (this.auras = []);
+    const i = list.findIndex((a) => a.pid === pid);
+    const a = { pid, col, dur, t: 0, spark: 0, fast };
+    if (i >= 0) list[i] = a; else list.push(a);
   }
 
   /** Called by the scene when a meteor lands (it sees the hazard pass from delay to impact). */
@@ -768,6 +835,7 @@ export class Fx {
     this.words.length = 0;
     while (this.shapes.length) this.shapePool.push(this.shapes.pop());
     this.burn.clear();
+    if (this.auras) this.auras.length = 0;
     for (const e of [this.puffs, this.sparks, this.bones, this.dusts, this.plusses, this.embers, this.glints, this.trails]) e.killAll();
     this.trauma = 0; this.zoomKick = 0;
     this.g.clear(); this.gl.clear();
@@ -847,6 +915,26 @@ export class Fx {
       const k = s.t / s.dur;
       if (k >= 1) { this.shapePool.push(s); this.shapes[i] = this.shapes[this.shapes.length - 1]; this.shapes.pop(); continue; }
       this.drawShape(s, k, g, gl);
+    }
+
+    // Running buffs (Overdrive, Overclock): follow the caster's sprite.
+    const auras = this.auras || [];
+    for (let i = auras.length - 1; i >= 0; i--) {
+      const a = auras[i];
+      a.t += dt;
+      if (a.t >= a.dur) { auras.splice(i, 1); continue; }
+      const r = this.scene.pools?.players?.get(a.pid);
+      if (!r || !r.body) continue;
+      const x = r.body.x, y = r.body.y;
+      const left = a.dur - a.t, fade = left < 0.7 ? left / 0.7 : 1;
+      const pulse = 0.5 + 0.5 * Math.sin(a.t * (a.fast ? 20 : 11));
+      g.lineStyle(4, a.col, (0.3 + 0.4 * pulse) * fade).strokeEllipse(x, y + 22, 78 + pulse * 14, 30 + pulse * 6);
+      gl.fillStyle(a.col, 0.12 * fade).fillEllipse(x, y + 22, 74, 28);
+      a.spark -= dt;
+      if (a.spark <= 0) {
+        a.spark = a.fast ? 0.06 : 0.1;
+        this.spark(x + rr(-24, 24), y + rr(-22, 26), a.fast ? 0xffd0e4 : 0xd8fff8, 1);
+      }
     }
 
     this.sparkBudget = 14; this.numBudget = 5; this.deathBudget = 10; this.puffBudget = 60;

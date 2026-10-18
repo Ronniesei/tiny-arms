@@ -1,4 +1,4 @@
-// The 4 playable T-Rexes. `stats` adds flat points to stats; `mult` multiplies the final stat.
+// The 8 playable T-Rexes (the first 4 are always unlocked, the others are unlocked by `unlock`, see src/meta/unlocks.js). `stats` adds flat points to stats; `mult` multiplies the final stat.
 // Ability numbers live here too; the behaviour is in src/sim/systems/abilities.js.
 // `trait` is the hero's one rule twist: `name` and `desc` are shown on the lobby card, the other fields are
 // read by the sim (stats.js recomputeStats / weaponDamage / weaponCooldown / abilityCooldown, weapons.js and
@@ -11,6 +11,15 @@
 //   frenzyPerKill, frenzyMax  +% attack speed per kill until the end of the wave, capped at frenzyMax %
 //   extraPierce             extra enemies this hero's projectiles pierce (same falloff as normal pierce)
 //   abilityCooldownMult     multiplier on the ability cooldown
+//   maxWeapons              weapon slots (default BALANCE.shop.maxWeapons). With 1 slot, buying another weapon replaces it (shop.js)
+//   weaponDmg, weaponAs     every weapon's damage x weaponDmg, and +weaponAs % attack speed (Pip's Lone Arm)
+//   amberBonus              +x of every amber pickup (0.4 = +40%), on top of Ancient Amber
+//   hoardPer, hoardPct, hoardMax   +hoardPct % damage for every hoardPer amber held, capped at hoardMax % (stats.js hoardBonus)
+//   summonDmg, extraSummons   summon weapons (turrets, drones) deal x summonDmg and get +extraSummons of each (meleeDmg works too)
+//   kindleChance, kindleDps, kindleTime   a hit sets the enemy alight with this chance; the burn is kindleDps x the hit per second
+//   burnMult                burn damage this hero deals x burnMult (burn ticks and burning ground; not bleeds)
+// `unlock` (heroes after the first four): {stat, target, text} read by src/meta/unlocks.js. stat is a lifetime stat there:
+//   bestWave (highest wave reached), amber / kills / wins (totals across runs). `text` is the condition shown in the lobby.
 
 export const CHARACTERS = {
   brutus: {
@@ -81,6 +90,82 @@ export const CHARACTERS = {
       range: 520, radius: 130, delay: 1, damage: 40, burnTime: 3, burnDps: 8,
     },
   },
+
+  pip: {
+    id: 'pip', name: 'Pip', role: 'One-Armed', color: '#f06aa0',
+    blurb: 'One weapon, one tiny arm, one big grudge. Every swing counts for a lot more.',
+    stats: {},
+    mult: {},
+    weapon: 'tail_spike',
+    unlock: { stat: 'bestWave', target: 10, text: 'Reach wave 10' },
+    trait: {
+      name: 'Lone Arm',
+      desc: 'Only ONE weapon slot, but that weapon deals x2.5 damage and +40% attack speed. A better weapon replaces it.',
+      maxWeapons: 1, weaponDmg: 2.5, weaponAs: 40,
+    },
+    ability: {
+      id: 'overdrive', name: 'Overdrive', cost: 45, cooldown: 14,
+      desc: '+100% attack speed for 5 s.',
+      duration: 5, attackSpeed: 100,
+    },
+  },
+  goldie: {
+    id: 'goldie', name: 'Goldie', role: 'Hoarder', color: '#e8b830',
+    blurb: 'Sits on a pile of amber and gets mightier the bigger it grows. Spend it, and the power fades.',
+    stats: { damage: -20, rangedDamage: 3, attackSpeed: 15, maxHp: 5 },
+    mult: {},
+    weapon: 'slingshot',
+    unlock: { stat: 'amber', target: 1500, text: 'Collect 1,500 amber in total' },
+    trait: {
+      name: 'Golden Touch',
+      desc: '+40% amber from pickups. +1% damage for every 20 amber held (max +60%), but -20% damage.',
+      amberBonus: 0.4, hoardPer: 20, hoardPct: 1, hoardMax: 60,
+    },
+    ability: {
+      id: 'gold_rush', name: 'Gold Rush', cost: 50, cooldown: 16,
+      desc: 'Every amber pickup on the map flies to you.',
+      pullSpeed: 420,
+    },
+  },
+  bolt: {
+    id: 'bolt', name: 'Bolt', role: 'Engineer', color: '#2fb5a8',
+    blurb: 'Would rather build a turret than throw a punch. Surrounds herself with gadgets.',
+    stats: { attackSpeed: -12, speed: -5 },
+    mult: {},
+    weapon: 'egg_turret',
+    unlock: { stat: 'kills', target: 2000, text: 'Kill 2,000 enemies in total' },
+    trait: {
+      name: 'Workshop',
+      desc: 'Turrets and drones deal +60% damage and you get +1 extra of each. Melee weapons deal -50% damage.',
+      summonDmg: 1.6, extraSummons: 1, meleeDmg: 0.5,
+    },
+    ability: {
+      id: 'overclock', name: 'Overclock', cost: 50, cooldown: 15,
+      desc: 'Your turrets and drones attack twice as fast for 6 s.',
+      duration: 6, rate: 2,
+    },
+  },
+  ash: {
+    id: 'ash', name: 'Ash', role: 'Firebrand', color: '#5a4a52',
+    blurb: 'Smoulders. Whatever Ash touches has a habit of catching fire, and the fire hits harder.',
+    stats: { rangedDamage: 4, abilityPower: 25, attackSpeed: 35, armor: 3, maxHp: 8 },
+    mult: { maxHp: 0.75 },
+    weapon: 'ember_staff',
+    unlock: { stat: 'wins', target: 1, text: 'Win a run (any Danger)' },
+    trait: {
+      name: 'Kindling',
+      desc: 'Hits have a 20% chance to ignite (25% of the hit per second for 2 s). Burns deal +30%, but you have -25% max HP.',
+      kindleChance: 0.2, kindleDps: 0.25, kindleTime: 2, burnMult: 1.3,
+    },
+    ability: {
+      id: 'eruption', name: 'Eruption', cost: 50, cooldown: 13,
+      desc: 'A ring of fire bursts around you (170 px), hurting and igniting every enemy in it.',
+      radius: 170, damage: 14, burnDps: 8, burnTime: 3, knockback: 220,
+    },
+  },
 };
 
-export const CHARACTER_IDS = ['brutus', 'fern', 'spike', 'sparky'];
+export const CHARACTER_IDS = ['brutus', 'fern', 'spike', 'sparky', 'pip', 'goldie', 'bolt', 'ash'];
+
+/** Heroes that are unlocked from the start (no `unlock` rule). */
+export const STARTER_IDS = CHARACTER_IDS.filter((id) => !CHARACTERS[id].unlock);

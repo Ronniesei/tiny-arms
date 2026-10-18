@@ -2,7 +2,9 @@
 
 import { CHARACTER_IDS, CHARACTERS } from '../data/characters.js';
 import { PLAYER_COLORS_CSS } from '../render/art.js';
+import { loadProgress, isUnlocked, heroProgress } from '../meta/unlocks.js';
 import { esc } from './describe.js';
+import { tip } from './tips.js';
 
 const SPR = (key) => `assets/sprites/${key}.svg`;
 const DEFAULT_NAMES = ['Rex', 'Chomp', 'Stompy', 'Nibbles', 'Rawr', 'Bonesy', 'Tiny', 'Mango', 'Pebble', 'Fangs'];
@@ -14,12 +16,43 @@ export function defaultName() {
   return pickedName;
 }
 
+/**
+ * The small "Progress" panel on the menu: heroes unlocked, lifetime stats, and how close the nearest locked hero is.
+ * Reads this browser's progress (src/meta/unlocks.js); works with no storage (everything at zero).
+ */
+export function progressPanel(progress = loadProgress()) {
+  const total = CHARACTER_IDS.length;
+  const open = CHARACTER_IDS.filter((id) => isUnlocked(id, progress)).length;
+  const t = progress.totals;
+  const f = (v) => v.toLocaleString('en');
+  // The locked hero that is closest to unlocking.
+  let next = null;
+  for (const id of CHARACTER_IDS) {
+    if (isUnlocked(id, progress)) continue;
+    const g = heroProgress(id, progress);
+    if (!next || g.frac > next.g.frac) next = { id, g };
+  }
+  const chips = [
+    ['Runs', t.runs, 'Runs you have finished in this browser, won or lost.'],
+    ['Wins', t.wins, 'Runs you won by surviving all 20 waves. Winning a run unlocks Ash.'],
+    ['Best wave', t.bestWave, 'The furthest wave you have reached in any run. Reaching wave 10 unlocks Pip.'],
+    ['Kills', t.kills, 'Enemies you have defeated across all runs. Killing 2,000 unlocks Bolt.'],
+    ['Amber', t.amber, 'Amber you have collected across all runs. Collecting 1,500 unlocks Goldie.'],
+  ].map(([k, v, hint]) => `<span data-tip-text="${esc(hint)}"><b>${f(v)}</b> ${k}</span>`).join('');
+  return `<div class="progress" data-tip-text="Your progress is saved in this browser only. Heroes are unlocked by playing: no codes, no shop.">
+    <div class="phead"><b data-tip-text="Heroes unlocked in this browser. The first four are always open; the other ${total - 4 > 0 ? total - 4 : 0} are earned by playing.">Heroes ${open}/${total}</b>${next ? `<span class="pnext" data-tip-text="${esc(`${CHARACTERS[next.id].name} is the locked hero closest to unlocking: ${next.g.text} (${f(next.g.have)} of ${f(next.g.target)}).`)}">Next: <b>${esc(CHARACTERS[next.id].name)}</b> · ${esc(next.g.text)} (${f(next.g.have)}/${f(next.g.target)})</span>` : '<span class="pnext">Every hero unlocked</span>'}</div>
+    <div class="pstats">${chips}</div>
+  </div>`;
+}
+
 export function menuScreen(ui) {
   const st = ui.app.settings;
+  const progress = loadProgress();
+  const shown = CHARACTER_IDS.filter((id) => isUnlocked(id, progress));
   return `<div class="center"><div class="panel menu">
     <div class="logo">TINY <span>ARMS</span></div>
     <p class="tag">Co-op dino survival for 1-4 mates</p>
-    <div class="heroes">${CHARACTER_IDS.map((c, i) => `<figure style="--pc:${PLAYER_COLORS_CSS[i]};--hc:${CHARACTERS[c].color};--i:${i}"><img src="${SPR(`h_${c}`)}" alt="${CHARACTERS[c].name}"><figcaption>${CHARACTERS[c].name}</figcaption></figure>`).join('')}</div>
+    <div class="heroes" style="--n:${shown.length}">${shown.map((c, i) => `<figure style="--pc:${PLAYER_COLORS_CSS[i % 4]};--hc:${CHARACTERS[c].color};--i:${i}"><img src="${SPR(`h_${c}`)}" alt="${CHARACTERS[c].name}"><figcaption>${CHARACTERS[c].name}</figcaption></figure>`).join('')}</div>
     <label class="field namefield">Your name <input id="name" maxlength="16" value="${esc(st.name)}" placeholder="${esc(defaultName())}" autocomplete="off"></label>
     <button class="big go play" data-act="solo">Play solo</button>
     ${globalThis.TINY_ARMS_SOLO_ONLY
@@ -29,6 +62,7 @@ export function menuScreen(ui) {
       <div class="joinbox"><input id="code" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false"><button class="big" data-act="join">Join</button></div>
     </div>`}
     <div class="row links"><button class="ghost" data-act="help">How to play</button><button class="ghost" data-act="settings">Settings</button></div>
+    ${progressPanel(progress)}
   </div></div>${ui.helpOpen ? howToPlayModal() : ''}`;
 }
 

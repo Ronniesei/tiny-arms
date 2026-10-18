@@ -41,7 +41,7 @@ export function statLine(k, v) {
   const num = Number(v) || 0;
   const label = statLabel(k);
   const value = `${num > 0 ? '+' : ''}${fmt(num)}${isPct(k) ? '%' : ''}`;
-  return { text: `${value} ${label}`, good: num > 0, label, value };
+  return { text: `${value} ${label}`, good: num > 0, label, value, key: k };
 }
 
 const tierVal = (v, tier) => (Array.isArray(v) ? v[tier - 1] : v);
@@ -63,7 +63,7 @@ export function weaponStats(wid, tier, stats = null) {
   const base = d.dmg[i];
   const dmg = stats ? weaponDamage(d, t, stats) : base;
   const cooldown = stats ? weaponCooldown(d, t, stats) : d.cooldown[i];
-  const count = d.behaviour === 'turret' ? (tierVal(d.count, t) || 1) : 1;
+  const count = d.behaviour === 'turret' ? (tierVal(d.count, t) || 1) + (stats?.extraSummons || 0) : 1; // Bolt's Workshop: +1
   const dps = cooldown > 0 ? (dmg / cooldown) * count : 0;
   const range = stats ? weaponRange(d, stats) : d.range;
   return { base, dmg, cooldown, dps, range, count };
@@ -115,8 +115,11 @@ export function weaponLines(wid, tier, stats = null) {
   if (d.knockback >= 100) add('Knockback', fmt(d.knockback));
 
   if (d.desc) lines.push({ text: d.desc, note: true });
-  // Brutus's Thick Skull changes melee / ranged damage; the Damage number above already includes it.
-  const mult = stats ? (d.kind === 'melee' ? stats.meleeMult : stats.rangedMult) ?? 1 : 1;
+  // Hero traits that change this weapon's damage (Brutus's Thick Skull, Bolt's Workshop, Pip's Lone Arm); the Damage number
+  // above already includes them.
+  let mult = stats ? (d.kind === 'melee' ? stats.meleeMult : stats.rangedMult) ?? 1 : 1;
+  if (stats && (d.behaviour === 'drone' || d.behaviour === 'turret')) mult *= stats.heroSummonMult ?? 1;
+  if (stats) mult *= stats.heroDmgMult ?? 1;
   if (Math.abs(mult - 1) > 0.001) lines.push({ text: `Hero trait: ${mult > 1 ? '+' : '-'}${Math.round(Math.abs(mult - 1) * 100)}% damage`, note: true });
   return lines;
 }

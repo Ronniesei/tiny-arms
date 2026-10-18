@@ -79,6 +79,10 @@ const PRESETS = {
   tail_whirl:    { gap: 0.2, max: 1, pri: 3, vol: 0.8, pv: 0.03, layers: [L('noise', 1100, 1100, 1.25, 0.6, { q: 3, fm: [9, 750], att: 0.12, hold: 0.7 }), L('saw', 220, 280, 1.2, 0.1, { lp: 900, trem: [9, 0.7], hold: 0.7, att: 0.1 })] },
   meteor_call:   { gap: 0.2, max: 1, pri: 3, vol: 0.8, pv: 0.02, layers: [L('sine', 300, 1300, 0.4, 0.4), L('sq25', 600, 2600, 0.35, 0.12, { lp: 4000 }), L('noise', 2000, 6000, 0.3, 0.12, { ft: 'highpass' })] },
   meteor_fall:   { gap: 0.2, max: 1, pri: 2, vol: 0.8, pv: 0.02, layers: [L('sine', 2200, 220, 0.7, 0.28, { att: 0.15 }), L('noise', 3500, 500, 0.7, 0.25, { q: 2, att: 0.2 })] },
+  overdrive:     { gap: 0.2, max: 1, pri: 3, vol: 0.8, pv: 0.02, layers: [...arp('sq25', [659, 784, 988, 1319, 1568, 1976], 0.035, 0.1, 0.22, { lp: 4500 }), L('noise', 600, 5000, 0.35, 0.3, { q: 1.2, att: 0.05 }), L('saw', 110, 440, 0.4, 0.2, { lp: 1200 })] },
+  gold_rush:     { gap: 0.2, max: 1, pri: 3, vol: 0.8, pv: 0.01, layers: [...arp('tri', [784, 988, 1175, 1568, 1976, 2349], 0.055, 0.2, 0.34), ...arp('sine', [1568, 1976, 2349, 3136], 0.06, 0.28, 0.12, { at: 0.1 }), L('noise', 5000, 9000, 0.4, 0.07, { ft: 'highpass', at: 0.1 })] },
+  overclock:     { gap: 0.2, max: 1, pri: 3, vol: 0.8, pv: 0.02, layers: [L('saw', 120, 520, 0.5, 0.26, { lp: 1800, trem: [24, 0.7] }), L('sq25', 400, 1600, 0.4, 0.14, { lp: 3500, vib: [30, 0.1] }), ...arp('sq25', [880, 1175, 1568], 0.07, 0.1, 0.16, { at: 0.2, lp: 4500 }), L('noise', 3000, 6500, 0.3, 0.12, { ft: 'highpass', at: 0.05 })] },
+  eruption:      { gap: 0.2, max: 1, pri: 3, vol: 0.95, pv: 0.03, layers: [L('brown', 1400, 70, 0.9, 1), L('sine', 120, 30, 0.7, 0.9), L('noise', 700, 2600, 0.5, 0.5, { q: 0.8, att: 0.06 }), L('saw', 90, 45, 0.6, 0.3, { lp: 500 }), L('noise', 4000, 900, 0.7, 0.25, { ft: 'highpass', at: 0.12 })] },
   meteor_hit:    { gap: 0.2, max: 1, pri: 3, vol: 1, pv: 0.03, layers: [L('brown', 1600, 60, 1, 1), L('sine', 100, 28, 0.8, 1), L('noise', 3000, 300, 0.25, 0.6), L('sq25', 220, 60, 0.4, 0.2, { lp: 1200 })] },
 
   // ---- shop and menus ----

@@ -51,6 +51,7 @@ export function hitEnemy(w, e, amount, o = {}) {
   if (e.invHp > 0 && e.st === 'roar') return 0;
   const by = o.pid !== undefined && o.pid >= 0 ? w.players[o.pid] : null;
   if (by?.herd) amount *= 1 + BALANCE.coop.herdDamage * by.herd; // herd spirit
+  if (o.source === 'burn' && !o.secondary && by && by.stats.burnMult > 1) amount *= by.stats.burnMult; // Ash's Kindling: burns hit harder
   const dmg = Math.max(1, Math.round(amount));
   const dealt = Math.min(dmg, e.hp);
   e.hp -= dmg;

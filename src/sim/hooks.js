@@ -14,6 +14,8 @@
 // SPECIAL_RULES.dynamite.maxDepth deep. Everything is deterministic: the seeded world RNG only, nothing allocated per tick
 // unless an effect actually fires.
 //
+// Hero trait: Ash's Kindling (onHit) lives here too.
+//
 // Events used (all already drawn by render/fx.js): explode, hit, heal, beam (the Chain Spark line), cast (Spell Echo).
 
 import { ENEMIES } from '../data/enemies.js';
@@ -21,6 +23,7 @@ import { SPECIAL_RULES } from '../data/items.js';
 import { emit, spawnHazard } from './entities.js';
 import { chance } from './rng.js';
 import { hitEnemy, healPlayer } from './systems/damage.js';
+import { applyBurn } from './systems/status.js';
 import { explode } from './systems/projectiles.js';
 import { castEcho } from './systems/abilities.js';
 
@@ -166,6 +169,10 @@ function shockwave(w, e, p, dmg, o, frac) {
 export function onHit(w, e, p, dmg, o) {
   const sp = p.specials;
   if (!sp) return;
+  // Ash's Kindling: a hit (not a burn tick) may set the enemy alight for a share of the hit per second.
+  if (p.stats.kindle > 0 && o.source !== 'burn' && e.hp > 0 && chance(w.rng, p.stats.kindle)) {
+    applyBurn(e, dmg * p.stats.kindleDps, p.stats.kindleTime, p.id, o.wuid);
+  }
   if (o.crit) {
     if (sp.critHeal > 0) critHeal(w, p, sp);
     if (sp.chainZap > 0 && depth < 2) { depth++; chainZap(w, e, p, dmg, o, sp.chainZap); depth--; }

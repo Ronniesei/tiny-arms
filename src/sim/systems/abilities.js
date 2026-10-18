@@ -10,6 +10,7 @@ import { SPECIAL_RULES } from '../../data/items.js';
 import { emit, spawnHazard } from '../entities.js';
 import { abilityCooldown, abilityCost, abilityMult } from '../stats.js';
 import { hitEnemy, healPlayer } from './damage.js';
+import { applyBurn } from './status.js';
 import { addFuse } from '../hooks.js';
 
 /** 1 normally; the Spell Echo copy runs with this < 1 (strength of the copy). */
@@ -109,6 +110,59 @@ export const ABILITIES = {
       });
     },
   },
+
+  // ---- Pip, Goldie, Bolt, Ash ----
+  // Overdrive and Overclock are timed buffs kept in p.abState (like Tail Whirl): `as` is read by stats.js weaponCooldown
+  // (stats.abilityAs, kept fresh below), `rate` by summons.js. Spell Echo's copy only refreshes the timer of the running buff.
+
+  overdrive: {
+    cast(w, p, ab) {
+      p.abState = { id: 'overdrive', t: 0, as: ab.attackSpeed };
+      p.stats.abilityAs = ab.attackSpeed;
+    },
+    echo(w, p, ab) { if (p.abState?.id === 'overdrive') p.abState.t = 0; },
+    tick(w, p, ab, dt) {
+      const s = p.abState;
+      s.t += dt;
+      if (s.t >= ab.duration) p.abState = null;
+    },
+  },
+
+  // Every loose amber pickup flies to the caster. Pickups already flying to someone (a mate) are left alone.
+  gold_rush: {
+    canCast(w) {
+      for (const pk of w.pickups) if (!pk.dead && pk.kind === 'amber' && pk.magnet < 0) return true;
+      return false;
+    },
+    cast(w, p, ab) {
+      for (const pk of w.pickups) {
+        if (pk.dead || pk.kind !== 'amber' || pk.magnet >= 0) continue;
+        pk.magnet = p.id;
+        pk.speed = Math.max(pk.speed || 0, ab.pullSpeed);
+      }
+    },
+  },
+
+  overclock: {
+    cast(w, p, ab) { p.abState = { id: 'overclock', t: 0, rate: ab.rate }; },
+    echo(w, p, ab) { if (p.abState?.id === 'overclock') p.abState.t = 0; },
+    tick(w, p, ab, dt) {
+      const s = p.abState;
+      s.t += dt;
+      if (s.t >= ab.duration) p.abState = null;
+    },
+  },
+
+  // A ring of fire around the caster: damage plus a burn on everything inside.
+  eruption: {
+    cast(w, p, ab) {
+      const dmg = abilityDamage(w, p, ab.damage), dps = abilityDamage(w, p, ab.burnDps);
+      for (const e of enemiesNear(w, p.x, p.y, ab.radius)) {
+        hitEnemy(w, e, dmg, { pid: p.id, kb: ab.knockback, kbAngle: Math.atan2(e.y - p.y, e.x - p.x), source: 'a' });
+        applyBurn(e, dps, ab.burnTime, p.id);
+      }
+    },
+  },
 };
 
 export function tryCast(w, p) {
@@ -148,11 +202,12 @@ export function update(w, dt) {
     if (p.abSeen < 0) p.abSeen = p.input.ab;
     const pressed = p.input.ab > p.abSeen;
     p.abSeen = p.input.ab;
-    if (p.downed) { p.abState = null; continue; }
+    if (p.downed) { p.abState = null; p.stats.abilityAs = 0; continue; }
     if (pressed && !tryCast(w, p)) emit(w, { type: 'castFail', pid: p.id });
     if (p.abState) {
       const ab = CHARACTERS[p.char].ability;
       ABILITIES[p.abState.id]?.tick?.(w, p, ab, dt);
     }
+    p.stats.abilityAs = p.abState?.as || 0; // Overdrive's attack speed lasts exactly as long as the buff
   }
 }

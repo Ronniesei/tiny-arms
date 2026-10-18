@@ -13,6 +13,8 @@
 //    build (the tags of the items you hold, plus what your weapons are: melee, ranged, summon, explosive).
 //  - sell a weapon for 25% of its current price; two identical weapons of one tier merge up one tier;
 //    buying a duplicate with all slots full merges it automatically.
+//  - weapon slots are per hero (maxWeaponsOf): Pip's Lone Arm gives 1. With a single slot, buying a different weapon
+//    swaps it in and pays out the old one's sell price (a plain sell would leave Pip with none).
 //  - loot crates (crates.js): the crate offers waiting at the top of the shop are settled with {op:'crate'}; Ready takes
 //    the ones still unopened.
 
@@ -21,7 +23,7 @@ import { WEAPONS, WEAPON_IDS } from '../data/weapons.js';
 import { ENEMIES } from '../data/enemies.js';
 import { WAVES } from '../data/waves.js';
 import { ITEMS, ITEM_IDS, TIER_ODDS, SHOP_RULES } from '../data/items.js';
-import { recomputeStats, refreshHoard } from './stats.js';
+import { recomputeStats, refreshHoard, maxWeaponsOf } from './stats.js';
 import { next, pick, chance, shuffle, int, weighted } from './rng.js';
 import { crateOp, autoResolve } from './crates.js';
 import { chooseLevel, rollLevelChoices, rerollLevelChoices } from './levelup.js';
@@ -42,6 +44,10 @@ export const HERO_LEAN = {
   fern: ['hpRegen', 'abilityPower', 'rangedDamage', 'maxHp'],
   spike: ['damage', 'meleeDamage', 'attackSpeed', 'critChance'],
   sparky: ['rangedDamage', 'abilityPower', 'range', 'manaRegen'],
+  pip: ['attackSpeed', 'damage', 'meleeDamage', 'critChance'],
+  goldie: ['harvesting', 'luck', 'rangedDamage', 'pickupRange'],
+  bolt: ['rangedDamage', 'abilityPower', 'attackSpeed', 'range'],
+  ash: ['abilityPower', 'rangedDamage', 'maxHp', 'attackSpeed'],
 };
 
 /** Does this item raise (positive value) at least one of the stats? */
@@ -273,9 +279,12 @@ export function openShop(w, p) {
 
 // ---- Weapons ----
 
+/** How a weapon offer would join the build: 'add' (free slot), 'merge' (same weapon and tier), 'swap' (one-slot heroes), or null. */
 function canAddWeapon(p, wid, tier) {
-  if (p.weapons.length < S.maxWeapons) return 'add';
+  const max = maxWeaponsOf(p.char);
+  if (p.weapons.length < max) return 'add';
   if (tier < 4 && p.weapons.some((x) => x.wid === wid && x.tier === tier)) return 'merge';
+  if (max === 1 && p.weapons.length === 1) return 'swap';
   return null;
 }
 
@@ -309,7 +318,11 @@ function runShopOp(w, p, op) {
         const how = canAddWeapon(p, o.id, o.tier);
         if (!how) return { ok: false, msg: 'Weapon slots full' };
         if (how === 'add') p.weapons.push({ wid: o.id, tier: o.tier, cd: 0.3, uid: p.nextWeaponUid++ });
-        else mergeInto(p, o.id, o.tier);
+        else if (how === 'swap') {
+          const old = p.weapons[0];
+          p.amber += sellPrice(w, old); // the old weapon is sold; its damage record stays in the score
+          p.weapons[0] = { wid: o.id, tier: o.tier, cd: 0.3, uid: p.nextWeaponUid++ };
+        } else mergeInto(p, o.id, o.tier);
       } else {
         if (atItemLimit(p, o.id)) return { ok: false, msg: 'Item limit reached' };
         p.items.push(o.id);
@@ -393,7 +406,10 @@ function spendLeftovers(w, p) {
     let best = -1, bestScore = -1;
     p.shop.offers.forEach((o, slot) => {
       if (!o || o.price > p.amber) return;
-      if (o.kind === 'weapon' ? !canAddWeapon(p, o.id, o.tier) : atItemLimit(p, o.id)) return;
+      if (o.kind === 'weapon') {
+        const how = canAddWeapon(p, o.id, o.tier);
+        if (!how || (how === 'swap' && o.tier <= p.weapons[0].tier)) return; // never swap sideways or down on its own
+      } else if (atItemLimit(p, o.id)) return;
       const score = o.tier * 1000 + o.price;
       if (score > bestScore) { bestScore = score; best = slot; }
     });
