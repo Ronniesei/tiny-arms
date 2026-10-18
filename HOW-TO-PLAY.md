@@ -2,6 +2,8 @@
 
 Co-op dino survival for 1-4 mates, each at home in their own browser. Survive 20 waves of prehistoric nasties, then beat the Triceratops.
 
+**Play here:** https://ronniesei.github.io/tiny-arms/ (Chrome, Edge or Firefox on a PC; keyboard needed).
+
 ## Joining a game (under 30 seconds)
 1. Whoever hosts clicks **Host a game** and then **Copy invite link**, and pastes the link in the chat.
 2. Everyone else opens the link, types a name and picks a T-Rex.
