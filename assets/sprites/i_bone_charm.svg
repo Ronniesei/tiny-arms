@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<g stroke-linejoin="round" stroke-linecap="round">
+<g transform="rotate(-16 32 43)">
+<path d="M17 38 H47 V48 H17 Z M10.5 37 a6.5 6.5 0 1 1 13 0 a6.5 6.5 0 1 1 -13 0 M10.5 49 a6.5 6.5 0 1 1 13 0 a6.5 6.5 0 1 1 -13 0 M40.5 37 a6.5 6.5 0 1 1 13 0 a6.5 6.5 0 1 1 -13 0 M40.5 49 a6.5 6.5 0 1 1 13 0 a6.5 6.5 0 1 1 -13 0" fill="#2b2118" stroke="#2b2118" stroke-width="8"/>
+<path d="M17 38 H47 V48 H17 Z M10.5 37 a6.5 6.5 0 1 1 13 0 a6.5 6.5 0 1 1 -13 0 M10.5 49 a6.5 6.5 0 1 1 13 0 a6.5 6.5 0 1 1 -13 0 M40.5 37 a6.5 6.5 0 1 1 13 0 a6.5 6.5 0 1 1 -13 0 M40.5 49 a6.5 6.5 0 1 1 13 0 a6.5 6.5 0 1 1 -13 0" fill="#f4ead6" stroke="none"/>
+<path d="M17 46 H47 V48 H17 Z" fill="#d9c9a3" stroke="none"/>
+<path d="M13 33 Q16 31 19 32 M45 33 Q48 31 51 32" fill="none" stroke="#fff" stroke-width="2.5"/>
+<path d="M28 36 L28 50 M36 36 L36 50" fill="none" stroke="#2b2118" stroke-width="7"/>
+<path d="M28 36 L28 50 M36 36 L36 50" fill="none" stroke="#c8924e" stroke-width="3"/>
+</g>
+<path d="M26 38 C14 24 20 5 31 5 C42 5 44 22 34 36" fill="none" stroke="#2b2118" stroke-width="7"/>
+<path d="M26 38 C14 24 20 5 31 5 C42 5 44 22 34 36" fill="none" stroke="#c8924e" stroke-width="3"/>
+</g>
+</svg>

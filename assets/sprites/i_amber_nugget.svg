@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<g stroke="#2b2118" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<path d="M10 34 C7 22 17 11 31 9 C46 8 57 18 55 32 C54 46 45 56 31 55 C18 54 12 46 10 34 Z" fill="#ffb627"/>
+<path d="M53 33 C52 45 44 53 31 53 C40 48 47 40 49 28 Z" fill="#d98a10" stroke="none"/>
+<path d="M16 26 C17 19 22 15 28 14" fill="none" stroke="#fff4b0" stroke-width="3.5"/>
+<circle cx="14.5" cy="33" r="1.8" fill="#fff4b0" stroke="none"/>
+<g transform="rotate(20 32 34)" stroke="#4a2a10" fill="#4a2a10">
+<ellipse cx="27" cy="31" rx="6" ry="2.8" transform="rotate(-25 27 31)" fill="#fff4dc" stroke-width="1.4" opacity=".8"/>
+<ellipse cx="37" cy="31" rx="6" ry="2.8" transform="rotate(25 37 31)" fill="#fff4dc" stroke-width="1.4" opacity=".8"/>
+<path d="M29 30 L23 34 M35 30 L41 34 M29.5 33 L23 39 M34.5 33 L41 39 M30.5 36 L26 43 M33.5 36 L38 43" fill="none" stroke-width="1.8"/>
+<ellipse cx="32" cy="38" rx="4" ry="6.5" stroke="none"/>
+<circle cx="32" cy="30" r="3.4" stroke="none"/>
+<circle cx="32" cy="25" r="2.6" stroke="none"/>
+<path d="M31 23 L28 19 M33 23 L36 19" fill="none" stroke-width="1.5"/>
+</g>
+</g>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+<g stroke="#2b2118" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+<path d="M56 80 C42 88 24 90 8 86 C22 102 38 114 56 114 Z" fill="#2f6f6a"/>
+<path d="M58 82 C54 56 62 32 78 20 L82 30 C84 22 88 16 92 10 L98 26 C102 20 106 16 112 10 C114 30 122 54 130 80 Z" fill="#c0583a"/>
+<path d="M58 82 C58 68 62 56 68 46 C82 58 104 64 126 66 C128 70 129 76 130 80 Z" fill="#8e3f2a" stroke="none"/>
+<path d="M66 82 L78 24 M82 80 L92 14 M98 80 L102 22 M114 80 L112 16" fill="none" stroke="#8e3f2a" stroke-width="4.5"/>
+<path d="M92 128 L92 162 Q92 170 100 170 L124 170 Q126 162 118 158 L116 128 Z" fill="#1f4f4c"/>
+<path d="M44 106 C44 82 66 70 94 72 C124 74 142 86 144 106 C146 130 120 140 92 140 C64 140 44 130 44 106 Z" fill="#2f6f6a"/>
+<path d="M60 118 C70 134 110 138 136 122 C132 134 118 140 94 140 C74 140 62 132 60 118 Z" fill="#a8d4c0" stroke="none"/>
+<path d="M68 82 Q73 92 68 102 M84 78 Q89 88 84 98 M100 78 Q105 88 100 98" fill="none" stroke="#1f4f4c" stroke-width="5"/>
+<path d="M64 126 L62 160 Q62 170 72 170 L98 170 Q102 162 92 158 L92 126 Z" fill="#2f6f6a"/>
+<path d="M99 160 L108 166 L99 171 Z" fill="#f4ead6" stroke-width="4.5"/>
+<path d="M116 100 Q128 100 131 108 Q124 113 120 109" fill="#2f6f6a" stroke-width="5"/>
+<path d="M146 66 Q152 50 162 60 Z" fill="#1f4f4c"/>
+<path d="M120 88 C120 68 138 56 158 58 C174 60 186 68 188 78 C189 88 182 96 170 98 L150 102 C132 104 120 100 120 88 Z" fill="#2f6f6a"/>
+<path d="M130 96 C146 104 170 102 186 88 L187 82 C176 98 150 98 130 92 Z" fill="#1f4f4c" stroke="none"/>
+<path d="M142 90 Q166 96 186 84" fill="none" stroke-width="4.5"/>
+<path d="M156 92 L159 99 L162 93 M168 92 L171 98 L174 90" fill="#fff" stroke-width="3"/>
+<path d="M140 62 L158 68" fill="none" stroke-width="6"/>
+<circle cx="150" cy="73" r="9" fill="#fff4b0" stroke-width="4.5"/>
+<circle cx="153" cy="75" r="5.6" fill="#2b2118" stroke="none"/>
+<circle cx="155.5" cy="72" r="2" fill="#fff" stroke="none"/>
+<circle cx="181" cy="73" r="2.5" fill="#2b2118" stroke="none"/>
+</g>
+</svg>

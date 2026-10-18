@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<defs>
+<radialGradient id="glow" cx="50%" cy="50%" r="50%">
+<stop offset="0%" stop-color="#ffb627" stop-opacity=".6"/>
+<stop offset="100%" stop-color="#ffb627" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<g transform="rotate(45 32 32)" stroke-linejoin="round" stroke-linecap="round">
+<circle cx="32" cy="20" r="19" fill="url(#glow)"/>
+<g stroke="#2b2118" stroke-width="3.5">
+<path d="M32 3 L43 14 L41 36 L32 46 L23 36 L21 14 Z" fill="#ffb627"/>
+<path d="M32 3 L21 14 L23 36 L32 46 Z" fill="#e08a10" stroke="none"/>
+<path d="M32 9 L39 16 L38 28 L32 22 Z" fill="#ffd978" stroke="none"/>
+<path d="M32 3 L43 14 L41 36 L32 46 L23 36 L21 14 Z" fill="none"/>
+<circle cx="29" cy="12" r="1.8" fill="#fff" stroke="none"/>
+<path d="M22 46 L42 46 L39 60 L25 60 Z" fill="#8a8078"/>
+<path d="M23 54 L41 54 L39 60 L25 60 Z" fill="#6a6058" stroke="none"/>
+<path d="M22 46 L42 46 L39 60 L25 60 Z" fill="none"/>
+<path d="M23 44 C17 40 17 32 22 28 M41 44 C47 40 47 32 42 28" fill="none" stroke-width="9"/>
+</g>
+<path d="M23 44 C17 40 17 32 22 28 M41 44 C47 40 47 32 42 28" fill="none" stroke="#8a8078" stroke-width="3.5"/>
+</g>
+</svg>

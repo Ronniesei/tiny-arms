@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<g stroke="#2b2118" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<path d="M32 31 C32 44 38 52 47 58" fill="none" stroke-width="8"/>
+<path d="M32 31 C32 44 38 52 47 58" fill="none" stroke="#3f8a3a" stroke-width="3.5"/>
+<g transform="translate(32 29) rotate(45)">
+<path d="M0 0 C-8 -4 -15 -12 -11 -19 C-7 -24 -1 -22 0 -16 C1 -22 7 -24 11 -19 C15 -12 8 -4 0 0 Z" fill="#4aa84a"/>
+<path d="M0 -3 L0 -14" fill="none" stroke="#9be07a" stroke-width="2"/>
+</g>
+<g transform="translate(32 29) rotate(135)">
+<path d="M0 0 C-8 -4 -15 -12 -11 -19 C-7 -24 -1 -22 0 -16 C1 -22 7 -24 11 -19 C15 -12 8 -4 0 0 Z" fill="#4aa84a"/>
+<path d="M0 -3 L0 -14" fill="none" stroke="#9be07a" stroke-width="2"/>
+</g>
+<g transform="translate(32 29) rotate(225)">
+<path d="M0 0 C-8 -4 -15 -12 -11 -19 C-7 -24 -1 -22 0 -16 C1 -22 7 -24 11 -19 C15 -12 8 -4 0 0 Z" fill="#4aa84a"/>
+<path d="M0 -3 L0 -14" fill="none" stroke="#9be07a" stroke-width="2"/>
+</g>
+<g transform="translate(32 29) rotate(315)">
+<path d="M0 0 C-8 -4 -15 -12 -11 -19 C-7 -24 -1 -22 0 -16 C1 -22 7 -24 11 -19 C15 -12 8 -4 0 0 Z" fill="#4aa84a"/>
+<path d="M0 -3 L0 -14" fill="none" stroke="#9be07a" stroke-width="2"/>
+</g>
+<circle cx="32" cy="29" r="2.3" fill="#9be07a" stroke="none"/>
+</g>
+</svg>

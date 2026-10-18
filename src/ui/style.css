@@ -1,0 +1,42 @@
+/* Tiny Arms UI: chunky rounded panels, cream text, amber accents (docs/ART-STYLE.md). */
+@font-face { font-family: 'Fredoka'; src: url('../../assets/fonts/Fredoka.ttf') format('truetype'); font-weight: 300 700; font-display: swap; }
+
+:root {
+  --dark: #2b2118; --dark2: #3a2d21; --dark3: #4a3a2b; --cream: #fff4dc; --muted: #c9b89a; --amber: #ffb627;
+  --good: #7ddf5a; --bad: #ff6a5a;
+  --t1: #e8e2d6; --t2: #4aa8ff; --t3: #b066ff; --t4: #ff4a4a;
+  --font: 'Fredoka', 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #1a140f; overflow: hidden; font-family: var(--font); color: var(--cream); }
+#game { position: fixed; inset: 0; }
+#ui { position: fixed; inset: 0; pointer-events: none; }
+#ui > * { pointer-events: auto; }
+#ui.screen-game > *:not(.modal) { pointer-events: none; }
+
+.center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(26,20,15,.25), rgba(26,20,15,.7)); overflow: auto; }
+.panel { background: var(--dark); border: 4px solid #140e0a; border-radius: 24px; padding: 24px 28px; box-shadow: 0 10px 0 #140e0a, 0 20px 40px rgba(0,0,0,.45); max-width: 1180px; width: 100%; }
+.panel.small { max-width: 460px; text-align: center; }
+h1, h2, h3 { margin: 0 0 12px; letter-spacing: .5px; }
+h3 { font-size: 18px; color: var(--muted); margin-top: 14px; }
+p { margin: 6px 0; }
+.muted { color: var(--muted); }
+.row { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+
+button { font-family: var(--font); font-weight: 600; font-size: 18px; color: var(--cream); background: var(--dark3); border: 3px solid #140e0a; border-radius: 14px; padding: 10px 18px; cursor: pointer; box-shadow: 0 4px 0 #140e0a; transition: transform .06s, background .1s; }
+button:hover:not(:disabled) { background: #5d4936; transform: translateY(-1px); }
+button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #140e0a; }
+button:disabled { opacity: .45; cursor: default; }
+button.big { font-size: 22px; padding: 14px 26px; }
+button.go { background: #d97a1a; }
+button.go:hover:not(:disabled) { background: #f08a24; }
+button.go.on { background: #3f7d3a; }
+button img { width: 20px; height: 20px; vertical-align: -4px; }
+input { font-family: var(--font); font-size: 20px; color: var(--cream); background: #140e0a; border: 3px solid var(--dark3); border-radius: 12px; padding: 8px 12px; outline: none; }
+input:focus { border-color: var(--amber); }
+.field { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 16px; margin: 10px auto; max-width: 320px; text-align: left; }
+.check { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 10px; }
+
+.modal { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; pointer-events: auto !important; }
+#toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(30px); background: var(--dark); border: 3px solid var(--amber); border-radius: 14px; padding: 10px 20px; font-size: 18px; opacity: 0; transition: .2s; pointer-events: none; z-index: 10; }
+#toast.show { opacity: 1; transform: translateX(-50%); }
