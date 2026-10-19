@@ -281,6 +281,7 @@ function analyse(o, me) {
     } else if (full) {
       out.blocked = true;
       out.ribbons.push({ cls: 'full', text: 'Slots full' });
+      out.blockTip = `All ${maxW} weapon slots are full. Sell a weapon, or merge two of the same, to make room; then this costs ${o.price} amber.`;
     } else {
       const set = setBonusHint(o.id, me.weapons);
       if (set) out.set = set;
@@ -289,7 +290,11 @@ function analyse(o, me) {
     const have = me.items.filter((x) => x === o.id).length;
     const limit = ITEMS[o.id]?.limit || 0;
     out.have = have;
-    if (limit && have >= limit) { out.blocked = true; out.ribbons.push({ cls: 'full', text: 'Limit reached' }); }
+    if (limit && have >= limit) {
+      out.blocked = true;
+      out.ribbons.push({ cls: 'full', text: 'Limit reached' });
+      out.blockTip = `You already hold the most of this item you can (${limit}).`;
+    }
     else if (limit && have === limit - 1) out.hint = `Last one you can hold (limit ${limit}).`;
     // Synergy: it shares a tag with at least two things in your build (items you hold, what your weapons are).
     if (!out.blocked && sharedTags(o.id, ownedTags(me)).some((t) => t.n >= 2)) out.ribbons.push({ cls: 'syn', text: 'Synergy' });
@@ -309,8 +314,10 @@ export function offerCard(o, i, me) {
   const own = !isW && a.have ? `<li class="note">You own ${a.have}${def?.limit ? ` / ${def.limit}` : ''}</li>` : '';
   const set = a.set
     ? `<div class="setnote">Set bonus: <b>${esc(a.set.name)} (${a.set.threshold})</b> ${esc(a.set.text)}</div>` : '';
-  const state = !a.afford ? 'poor' : a.blocked ? 'blocked' : '';
-  const need = a.afford ? '' : ` data-tip-text="Need ${o.price - me.amber} more amber"`;
+  const state = [!a.afford && 'poor', a.blocked && 'blocked'].filter(Boolean).join(' ');
+  // A blocked offer still shows its price, so you can tell whether to make room for it.
+  const tipText = [a.blockTip, a.afford ? '' : `Need ${o.price - me.amber} more amber.`].filter(Boolean).join(' ');
+  const need = tipText ? ` data-tip-text="${esc(tipText)}"` : '';
   return `<article class="offer ${tcls(o.tier)} ${o.locked ? 'locked' : ''} ${a.merge ? 'merge' : ''} ${a.blocked ? 'blocked' : ''}">
     <kbd class="num">${i + 1}</kbd>
     ${ribbons ? `<div class="ribbons">${ribbons}</div>` : ''}
@@ -322,7 +329,7 @@ export function offerCard(o, i, me) {
     <ul class="lines">${linesHtml(lines)}${own}</ul>
     ${a.hint ? `<div class="mergenote">${esc(a.hint)}</div>` : ''}${set}
     <div class="buyrow">
-      <button class="buy ${state}" data-act="buy" data-slot="${i}"${need}>${a.blocked && a.ribbons[0] ? `<span>${esc(a.ribbons[0].text)}</span>` : `Buy ${AMBER} ${o.price}`}</button>
+      <button class="buy ${state}" data-act="buy" data-slot="${i}"${need}>${a.blocked && a.ribbons[0] ? `<span class="pr">${AMBER} ${o.price}</span><small>${esc(a.ribbons[0].text)}</small>` : `Buy ${AMBER} ${o.price}`}</button>
       <button class="lock ${o.locked ? 'on' : ''}" data-act="lock" data-slot="${i}"${tipAttr('lock')} aria-pressed="${!!o.locked}" data-tip-text="Lock: keep this offer through rerolls and into the next wave at today's price">${o.locked ? ICON.lock : ICON.unlock}<span>${o.locked ? 'Locked' : 'Lock'}</span></button>
     </div>
   </article>`;
@@ -340,7 +347,7 @@ function buildHtml(me, now) {
   }
   const rows = me.weapons.map((w) => weaponRow(w, me, pairs.has(w.uid))).join('')
     + '<div class="wrow empty">Empty slot</div>'.repeat(Math.max(0, maxW - me.weapons.length));
-  const sets = Object.entries(counts).map(([cls, n]) => setChip(cls, n, bonuses[cls])).join('');
+  const sets = Object.entries(counts).map(([cls, n]) => setChip(cls, n, bonuses[cls], me.weapons)).join('');
   const itemCounts = countItems(me.items);
   const itemIds = Object.keys(itemCounts).sort((a, b) => (ITEMS[b]?.tier || 1) - (ITEMS[a]?.tier || 1) || a.localeCompare(b));
   const items = itemIds.map((id) => itemTile(id, itemCounts[id])).join('');
@@ -380,7 +387,7 @@ function weaponRow(w, me, isPair) {
   </div>`;
 }
 
-function setChip(cls, n, active) {
+function setChip(cls, n, active, weapons = []) {
   const ths = classThresholds(cls);
   const nextTh = ths.find((t) => t > n);
   const name = CLASSES[cls]?.name || cls;
@@ -392,7 +399,9 @@ function setChip(cls, n, active) {
     const on = n >= t;
     return `<li class="kv ${on ? 'good' : ''}"><span>${t} weapons</span><b>${esc(lines.map((l) => l.text).join(', '))}</b></li>`;
   }).join('')}</ul><div class="tt-s">Duplicates count towards the set.</div>`;
-  return `<div class="set ${active ? 'on' : ''}" data-tip="${esc(tip)}"><b>${esc(name)} ×${n}</b>${body}</div>`;
+  // Which of your weapons make up the count (so "Swarm ×2" is never a mystery).
+  const members = weapons.filter((w) => WEAPONS[w.wid]?.cls === cls).map((w) => `${WEAPONS[w.wid].name} ${ROMAN[w.tier - 1]}`);
+  return `<div class="set ${active ? 'on' : ''}" data-tip="${esc(tip)}"><b>${esc(name)} ×${n}</b>${body}<small class="who">${esc(members.join(' · '))}</small></div>`;
 }
 
 function itemTile(id, n) {
@@ -408,7 +417,9 @@ function itemTile(id, n) {
 }
 
 function statsHtml(me, now) {
-  return STAT_KEYS.map((k) => {
+  // Amber first: it is the money for everything on this screen (and the XP for levels).
+  const amberRow = `<div class="amberrow"${tipAttr('amber')}><span>${AMBER} Amber</span><b>${me.amber}</b>${me.lastWaveAmber ? `<i class="dl good" data-tip-text="Amber you earned last wave: pickups plus Harvesting.">+${me.lastWaveAmber}</i>` : ''}</div>`;
+  return amberRow + STAT_KEYS.map((k) => {
     const val = +(me.stats[k] || 0);
     const base = BALANCE.baseStats[k] || 0;
     const d = val - (track.open[k] ?? val);

@@ -120,7 +120,10 @@
 .buyrow .buy:hover:not(:disabled) { background: #f08a24; }
 .buyrow .buy.poor { background: var(--dark3); color: var(--muted); }
 .buyrow .buy.poor .amb { filter: grayscale(1); opacity: .7; }
-.buyrow .buy.blocked { background: transparent; color: var(--bad); border-style: dashed; border-color: var(--dark3); box-shadow: none; font-size: 17px; }
+.buyrow .buy.blocked { background: transparent; color: var(--bad); border-style: dashed; border-color: var(--dark3); box-shadow: none; font-size: 17px; gap: 10px; }
+.buyrow .buy.blocked .pr { display: flex; align-items: center; gap: 5px; color: var(--cream); font-size: 20px; }
+.buyrow .buy.blocked.poor .pr { color: var(--muted); }
+.buyrow .buy.blocked small { font-size: 14px; }
 .buyrow .lock { display: flex; align-items: center; gap: 5px; font-size: 16px; }
 .buyrow .lock.on { background: var(--amber); color: #1a140f; }
 .buyrow .lock.on:hover:not(:disabled) { background: #ffc752; }
@@ -349,3 +352,8 @@
 .wrow .wt .lastdmg { display: flex; align-items: center; gap: 6px; color: var(--amber); font-size: 12px; }
 .wrow .wt .lastdmg .bar { flex: 0 0 56px; height: 6px; background: #140e0a; border-radius: 3px; overflow: hidden; }
 .wrow .wt .lastdmg .bar u { display: block; height: 100%; background: var(--amber); }
+.stats .amberrow { grid-column: 1 / -1; }
+.stats .amberrow span { display: flex; align-items: center; gap: 5px; color: var(--cream); }
+.stats .amberrow .amb { width: 16px; height: 16px; }
+.stats .amberrow b { color: var(--amber); }
+.set .who { flex-basis: 100%; color: var(--muted); font-size: 12px; }

@@ -5,10 +5,13 @@ import { CHARACTERS } from '../data/characters.js';
 
 // Design-space boxes [x, y, w, h] (keep in step with PAD / AB in src/render/hud.js).
 const SPOTS = [
-  { box: [20, 20, 384, 56], gloss: 'maxHp', text: 'Your HP bar. At 0 you go down (in co-op a mate can revive you).' },
-  { box: [20, 76, 384, 40], gloss: 'mana' },
-  { box: [20, 116, 200, 50], gloss: 'amber' },
-  { box: [220, 116, 184, 50], gloss: 'xp' },
+  // Matches hud.js: portrait x 20-164, HP bar y 30-76, mana bar y 80-112, amber icon+number x 160-300 at y 138,
+  // level (right-aligned at x 392) and XP bar below it.
+  { box: [20, 20, 144, 146], ability: true },
+  { box: [164, 24, 240, 54], gloss: 'maxHp', text: 'Your HP bar. At 0 you go down (in co-op a mate can revive you).' },
+  { box: [164, 78, 240, 36], gloss: 'mana' },
+  { box: [160, 114, 150, 52], gloss: 'amber', text: 'This number is the amber you have right now.' },
+  { box: [310, 114, 94, 52], gloss: 'xp' },
   { box: [20, 186, 420, 32], gloss: 'herd' },
   { box: [810, 20, 300, 130], text: 'Wave and time left. Survive until the timer hits 0; each wave builds to a rush at the end. Wave 20 is the boss.' },
   { box: [960 - 66, 940 - 66, 132, 150], ability: true },
@@ -59,8 +62,8 @@ export class HudTips {
     const s = this.app.session;
     const me = s?.view?.()?.players.find((p) => p.id === s.myId);
     const c = me && CHARACTERS[me.char];
-    const ab = this.layer.querySelector('.ability');
-    if (c && ab && ab.dataset.char !== c.id) {
+    for (const ab of this.layer.querySelectorAll('.ability')) {
+      if (!c || ab.dataset.char === c.id) continue;
       ab.dataset.char = c.id;
       ab.setAttribute('data-tip-text', `${c.ability.name} (Space): ${c.ability.desc} Costs ${c.ability.cost} mana, ${c.ability.cooldown} s cooldown.${c.trait ? `\nTrait, ${c.trait.name}: ${c.trait.desc}` : ''}`);
     }

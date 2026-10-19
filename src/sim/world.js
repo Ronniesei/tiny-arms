@@ -71,6 +71,7 @@ export function startWave(w, n) {
   for (const p of w.players) {
     if (p.gone) continue;
     recomputeStats(p);
+    p.score.amberMark = p.score.amber; // amber earned this wave = score.amber now minus this
     p.downed = false;
     p.reviveT = 0;
     p.hp = p.stats.maxHp;
@@ -101,7 +102,11 @@ export function endWave(w) {
   for (const pk of w.pickups) if (pk.kind === 'amber' && !pk.dead) w.bag += pk.v;
   w.pickups = [];
   w.enemies = []; w.projectiles = []; w.shots = []; w.hazards = []; w.summons = []; w.marks = [];
-  for (const p of w.players) if (!p.gone) payHarvest(w, p);
+  for (const p of w.players) {
+    if (p.gone) continue;
+    payHarvest(w, p);
+    p.score.lastWaveAmber = p.score.amber - (p.score.amberMark ?? p.score.amber); // pickups + Harvesting
+  }
   if (w.wave >= BALANCE.waves.count) { endRun(w, true); return; }
   w.phase = 'shop';
   w.shopTime = BALANCE.shop.time;
