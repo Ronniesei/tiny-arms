@@ -170,7 +170,8 @@ export function privateView(w, pid) {
     id: p.id, char: p.char, name: p.name, phase: w.phase, wave: w.wave, shopTime: w.shopTime,
     amber: p.amber, xp: p.xp, xpNext: BALANCE.xpToLevel(p.level), level: p.level, pendingLevels: p.pendingLevels,
     levelChoices: p.levelChoices, stats: { ...p.stats }, hp: p.hp,
-    weapons: p.weapons.map((x) => ({ uid: x.uid, wid: x.wid, tier: x.tier })), items: p.items.slice(),
+    weapons: p.weapons.map((x) => ({ uid: x.uid, wid: x.wid, tier: x.tier, last: p.score.byWeapon?.[x.uid]?.last || 0, total: p.score.byWeapon?.[x.uid]?.dmg || 0 })),
+    lastWaveDealt: p.score.lastWaveDealt || 0, items: p.items.slice(),
     // Loot crates waiting to be taken or recycled: [{cid, id, tier, price, recycle, elite}] (ops {op:'crate', idx, take, cid}).
     crates: (p.crateOffers || []).map((o) => ({ ...o })),
     shop: p.shop ? { offers: p.shop.offers.map((o) => (o ? { ...o } : null)), rerolls: p.shop.rerolls, rerollCost: rerollCost(w, p), levelRerollCost: levelRerollCost(w, p) } : null,

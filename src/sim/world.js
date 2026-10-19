@@ -90,6 +90,12 @@ export function startWave(w, n) {
 
 export function endWave(w) {
   emit(w, { type: 'waveEnd', wave: w.wave });
+  // Per-weapon damage of the wave just played, for the shop (Brotato shows it after every wave).
+  for (const p of w.players) {
+    for (const rec of Object.values(p.score.byWeapon || {})) { rec.last = rec.wave || 0; rec.wave = 0; }
+    p.score.lastWaveDealt = p.score.waveDealt || 0;
+    p.score.waveDealt = 0;
+  }
   collectLeftovers(w); // loot crates still on the ground go to the nearest player
   // Uncollected amber goes into the bag and is paid out over the next wave.
   for (const pk of w.pickups) if (pk.kind === 'amber' && !pk.dead) w.bag += pk.v;

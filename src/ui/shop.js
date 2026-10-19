@@ -355,6 +355,11 @@ function buildHtml(me, now) {
     <div class="stats">${statsHtml(me, now)}</div>`;
 }
 
+/** 950 -> "950", 12345 -> "12.3k". */
+function fmtK(n) {
+  return n >= 10000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
+}
+
 function weaponRow(w, me, isPair) {
   const d = WEAPONS[w.wid];
   const st = weaponStats(w.wid, w.tier, me.stats);
@@ -362,10 +367,12 @@ function weaponRow(w, me, isPair) {
   const only = me.weapons.length <= 1;
   const tip = `<div class="tt-h ${tcls(w.tier)}"><b>${esc(d?.name || w.wid)}</b> <i>${ROMAN[w.tier - 1]}</i></div>`
     + `<div class="tt-s">${esc(weaponClass(w.wid))} weapon · ${tierName(w.tier)}</div><ul class="lines">${linesHtml(weaponLines(w.wid, w.tier, me.stats))}</ul>`
+    + `<div class="tt-s">Damage last wave: <b>${fmtK(w.last || 0)}</b>${me.lastWaveDealt ? ` (${Math.round(100 * (w.last || 0) / me.lastWaveDealt)}% of yours)` : ''} · whole run: ${fmtK(w.total || 0)}</div>`
     + `<div class="tt-s">Sells for ${sell} amber${only ? ' (you must keep one weapon)' : ''}</div>`;
+  const share = me.lastWaveDealt ? Math.min(1, (w.last || 0) / me.lastWaveDealt) : 0;
   return `<div class="wrow ${tcls(w.tier)} ${isPair ? 'pair' : ''}" data-tip="${esc(tip)}">
     <div class="ico"><img src="${SPR(`w_${w.wid}`)}" ${IMG_ERR} alt=""><span class="rom">${ROMAN[w.tier - 1]}</span></div>
-    <div class="wt"><b>${esc(d?.name || w.wid)}</b><span>${esc(weaponClass(w.wid))} · ${st ? `${fmt(st.dmg)} dmg · ${fmt(st.dps)} DPS` : ''}</span></div>
+    <div class="wt"><b>${esc(d?.name || w.wid)}</b><span>${esc(weaponClass(w.wid))} · ${st ? `${fmt(st.dmg)} dmg · ${fmt(st.dps)} DPS` : ''}</span>${me.wave >= 1 ? `<span class="lastdmg" data-tip-text="Damage this weapon dealt in the wave you just played, and its share of all your damage."><i class="bar"><u style="width:${(share * 100).toFixed(1)}%"></u></i>${fmtK(w.last || 0)} last wave${me.lastWaveDealt ? ` · ${Math.round(share * 100)}%` : ''}</span>` : ''}</div>
     <div class="wb">
       ${isPair ? `<button class="mini merge" data-act="merge" data-uid="${w.uid}"${tipAttr('merge')} data-tip-text="Merge two identical weapons into tier ${ROMAN[w.tier]}">Merge → ${ROMAN[w.tier]}</button>` : ''}
       <button class="mini sell ${only ? 'off' : ''}" data-act="sell" data-uid="${w.uid}"${tipAttr('sell')} data-tip-text="${only ? 'Keep at least one weapon' : `Sell for ${sell} amber (25% of its price)`}">Sell ${AMBER} +${sell}</button>

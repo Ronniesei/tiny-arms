@@ -344,3 +344,8 @@
   .crate .cbtns { grid-column: 1 / -1; flex-direction: row; }
   .crate .cbtns button { flex: 1; }
 }
+
+/* Damage each weapon dealt last wave (Brotato-style) */
+.wrow .wt .lastdmg { display: flex; align-items: center; gap: 6px; color: var(--amber); font-size: 12px; }
+.wrow .wt .lastdmg .bar { flex: 0 0 56px; height: 6px; background: #140e0a; border-radius: 3px; overflow: hidden; }
+.wrow .wt .lastdmg .bar u { display: block; height: 100%; background: var(--amber); }

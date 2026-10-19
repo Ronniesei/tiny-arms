@@ -31,6 +31,7 @@ function creditWeapon(p, uid, dealt) {
     rec = bw[uid] = { wid: cur.wid, tier: cur.tier, dmg: 0 };
   } else if (cur) rec.tier = cur.tier; // merges raise the tier
   rec.dmg += dealt;
+  rec.wave = (rec.wave || 0) + dealt; // this wave only; world.endWave moves it to rec.last
 }
 
 /**
@@ -66,6 +67,7 @@ export function hitEnemy(w, e, amount, o = {}) {
   const p = o.pid !== undefined && o.pid >= 0 ? w.players[o.pid] : null;
   if (p) {
     p.score.damageDealt += dealt;
+    p.score.waveDealt = (p.score.waveDealt || 0) + dealt;
     if (o.wuid > 0) creditWeapon(p, o.wuid, dealt);
     if (!o.noLifeSteal && p.stats.lifeSteal > 0 && !p.downed && chance(w.rng, p.stats.lifeSteal / 100)) {
       if (p.lifeStealAcc < BALANCE.stat.lifeStealCapPerSec) {
