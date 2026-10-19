@@ -40,7 +40,7 @@ const lighten = (c, k) => { const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c
 for (const k of Object.keys(CHARACTERS)) { HERO_COL[k] = lighten(hex(CHARACTERS[k].color), 0.3); ABILITY_OWNER[CHARACTERS[k].ability.id] = k; }
 
 // Shape kinds
-const K_RING = 0, K_DISC = 1, K_BEAM = 2, K_ARC = 3, K_STAB = 4, K_BURST = 5, K_CRACKS = 6, K_PILLAR = 7, K_SWEEP = 8;
+const K_RING = 0, K_DISC = 1, K_BEAM = 2, K_ARC = 3, K_STAB = 4, K_BURST = 5, K_CRACKS = 6, K_PILLAR = 7, K_SWEEP = 8, K_FALL = 9;
 
 const SHOOT_SFX = {
   slingshot: 'shoot_sling', spear_thrower: 'shoot_spear', bone_bow: 'shoot_bow', ember_staff: 'shoot_ember', lava_lobber: 'shoot_lob',
@@ -362,6 +362,10 @@ export class Fx {
       case 'bossCall': this.onBossCall(ev); break;
       case 'tail': this.onTail(ev); break;
       case 'cast': this.onCast(ev, v, myId); break;
+      case 'stampede': this.onStampede(ev); break;
+      case 'jackpot': this.onJackpot(ev, myId); break;
+      case 'skyWarn': this.onSkyWarn(ev); break;
+      case 'skyfall': this.onSkyfall(ev); break;
       case 'castFail':
         if (ev.pid === myId) sfx.play('nope');
         break;
@@ -792,17 +796,131 @@ export class Fx {
         snd('eruption');
         break;
       }
+      case 'stampede': {
+        // Dash: a burst of speed lines at the start of the charge (the path itself comes from the 'stampede' event).
+        this.ring(x, y, col, 10, 90, 0.3, 8);
+        this.ring(x, y, 0xffffff, 6, 56, 0.22, 4, 0.04);
+        this.spark(x, y, col, 8);
+        this.word(x, y - 64, 'STAMPEDE!', col, 28, 0.8);
+        this.shake(0.2);
+        this.kick(0.015);
+        if (mine) sfx.play('charge', { rate: 1.3 }); else this.sfxAt('charge', x, y, 0.9, 0.25, 1.3);
+        break;
+      }
+      case 'jackpot': {
+        // Lucky: the reels spin. The prize itself comes from the 'jackpot' event (onJackpot).
+        this.ring(x, y, GOLD, 10, 70, 0.3, 6);
+        this.ring(x, y, 0xffffff, 6, 44, 0.22, 3, 0.05);
+        this.spark(x, y - 10, GOLD, 8);
+        snd('buy');
+        break;
+      }
       default:
         this.ring(x, y, col, 10, 100, 0.4, 8);
         sfx.play(ev.ab);
     }
   }
 
-  /** Overdrive / Overclock: a pulsing ring and sparks around the caster until the buff ends (replaces one already running). */
-  addAura(pid, col, dur, fast) {
+  /** Dash's Stampede: the streak along the whole charge, dust along it, and a glow trail that follows the sprite. */
+  onStampede(ev) {
+    const col = HERO_COL.dash || 0xff8a7a;
+    const dx = ev.x2 - ev.x, dy = ev.y2 - ev.y;
+    const s = this.shape(K_BEAM, ev.x, ev.y, 0.4, col);
+    s.x2 = ev.x2; s.y2 = ev.y2;
+    this.burst(ev.x, ev.y, CREAM, 16, 90, 0.25, 8, 4, ev.a + Math.PI);
+    this.dust(ev.x, ev.y + 14, 8);
+    for (let i = 1; i <= 5; i++) this.dust(ev.x + (dx * i) / 5, ev.y + (dy * i) / 5 + 14, 3);
+    this.addAura(ev.pid, col, 0.45, true, true);
+  }
+
+  /** Lucky's Jackpot: the prize that came up (ev.o = coin | lucky | amber | streak), with its own colours and word. */
+  onJackpot(ev, myId) {
+    const x = ev.x, y = ev.y, mine = ev.pid === myId;
+    const snd = (name, vol = 1) => { if (mine) sfx.play(name); else this.sfxAt(name, x, y, vol, 0.25); };
+    switch (ev.o) {
+      case 'coin': {
+        const R = ev.r || 210;
+        this.disc(x, y, 0xffd23a, R * 0.2, R * 1.05, 0.4, 0.55);
+        this.disc(x, y, 0xffffff, R * 0.1, R * 0.6, 0.2, 0.7);
+        this.ring(x, y, GOLD, R * 0.2, R * 1.1, 0.5, 16);
+        this.ring(x, y, 0xfff4dc, R * 0.1, R * 0.8, 0.35, 6, 0.06);
+        this.burst(x, y, GOLD, R * 0.3, R * 1.1, 0.3, 14, 5);
+        this.puff(x, y, 0xffc060, 14);
+        this.spark(x, y, GOLD, 16);
+        this.spark(x, y, 0xffffff, 8);
+        this.word(x, y - 70, 'COIN BOMB!', GOLD, 30, 1);
+        this.shake(0.4);
+        this.kick(0.02);
+        snd('boom');
+        break;
+      }
+      case 'lucky': {
+        this.ring(x, y, GREEN, 14, 150, 0.55, 10);
+        this.ring(x, y, CREAM, 8, 100, 0.45, 5, 0.06);
+        this.plus(x, y - 6, 8);
+        this.spark(x, y, 0xd8ffc8, 12);
+        this.word(x, y - 70, 'LUCKY BREAK!', GREEN, 30, 1.2);
+        this.addAura(ev.pid, GREEN, ev.t || 2, false); // the ring lasts as long as the safety
+        snd('revive', 0.8);
+        break;
+      }
+      case 'amber': {
+        this.ring(x, y, AMBER, 14, 160, 0.5, 9);
+        this.disc(x, y, AMBER, 10, 130, 0.35, 0.3);
+        for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; this.spark(x + Math.cos(a) * 110, y + Math.sin(a) * 90 - 30, AMBER, 2); }
+        this.spark(x, y, GOLD, 12);
+        this.word(x, y - 70, 'AMBER SHOWER!', AMBER, 30, 1.1);
+        snd('gold_rush', 0.8);
+        break;
+      }
+      case 'streak': {
+        const hot = 0xff6a3a;
+        this.ring(x, y, hot, 14, 120, 0.45, 10);
+        this.ring(x, y, 0xffffff, 8, 80, 0.3, 5, 0.05);
+        this.burst(x, y, 0xffb04a, 24, 130, 0.3, 12, 5);
+        this.spark(x, y, 0xffd36b, 12);
+        this.word(x, y - 70, 'HOT STREAK!', hot, 30, 1.1);
+        this.shake(0.1);
+        this.addAura(ev.pid, hot, ev.t || 5, true);
+        snd('overdrive', 0.8);
+        break;
+      }
+      default:
+    }
+  }
+
+  /** Danger 4-5: a meteor has been called. The fireball falls for ev.d s (the red circle comes from the hazard itself). */
+  onSkyWarn(ev) {
+    const s = this.shape(K_FALL, ev.x, ev.y, ev.d || 1.2, 0xffb040);
+    s.r1 = ev.r || 90;
+    const dx = ev.x - this.scene.camX;
+    sfx.play('meteor_fall', { delay: Math.max(0, (ev.d || 1.2) - 0.62), vol: 0.45, pan: clamp(dx / 640, -1, 1) * 0.7 });
+  }
+
+  /** A Danger 4-5 meteor lands (a lighter version of meteorImpact: there are many of them). */
+  onSkyfall(ev) {
+    const x = ev.x, y = ev.y, r = ev.r || 90;
+    this.disc(x, y, 0xffffff, r * 0.2, r * 0.9, 0.22, 0.85);
+    this.disc(x, y, 0xffa040, r * 0.3, r * 1.1, 0.4, 0.5);
+    this.ring(x, y, 0xffb627, r * 0.3, r * 1.2, 0.45, 12);
+    this.puff(x, y, 0xff8a3a, 14);
+    this.puff(x, y, 0x5a4636, 8);
+    this.spark(x, y, 0xffd36b, 10);
+    const s = this.shape(K_CRACKS, x, y, 1, 0x3a2d21);
+    s.r1 = r * 0.9; s.a = x * 0.011 + y * 0.017; s.n = 8;
+    const d = Math.hypot(x - this.scene.camX, y - this.scene.camY);
+    if (d < 520) { this.shake(0.28); this.kick(0.012); }
+    this.sfxAt('meteor_hit', x, y, 0.9, 0.3);
+  }
+
+  /**
+   * Overdrive / Overclock / Lucky Break / Hot Streak: a pulsing ring and sparks around the caster until the buff ends
+   * (replaces one already running). `trail` (Stampede) is a glow trail and dust behind the caster instead.
+   */
+  addAura(pid, col, dur, fast, trail = false) {
     const list = this.auras || (this.auras = []);
     const i = list.findIndex((a) => a.pid === pid);
-    const a = { pid, col, dur, t: 0, spark: 0, fast };
+    const a = { pid, col, dur, t: 0, spark: 0, fast, trail };
     if (i >= 0) list[i] = a; else list.push(a);
   }
 
@@ -926,6 +1044,13 @@ export class Fx {
       const r = this.scene.pools?.players?.get(a.pid);
       if (!r || !r.body) continue;
       const x = r.body.x, y = r.body.y;
+      if (a.trail) {
+        // Stampede: a bright trail where the sprite just was, dust kicked up and a few sparks.
+        this.trail(x, y + 6, a.col);
+        a.spark -= dt;
+        if (a.spark <= 0) { a.spark = 0.035; this.dust(x, y + 18, 1); this.spark(x + rr(-14, 14), y + rr(-8, 20), CREAM, 1); }
+        continue;
+      }
       const left = a.dur - a.t, fade = left < 0.7 ? left / 0.7 : 1;
       const pulse = 0.5 + 0.5 * Math.sin(a.t * (a.fast ? 20 : 11));
       g.lineStyle(4, a.col, (0.3 + 0.4 * pulse) * fade).strokeEllipse(x, y + 22, 78 + pulse * 14, 30 + pulse * 6);
@@ -1017,6 +1142,22 @@ export class Fx {
         const hw = (s.w / 2) * (1 - k * 0.7), h = s.r1 * Math.min(1, k * 4);
         gl.fillGradientStyle(s.color, s.color, s.color, s.color, 0, 0, 0.55 * inv, 0.55 * inv);
         gl.fillRect(s.x - hw, s.y - h, hw * 2, h);
+        break;
+      }
+      case K_FALL: {
+        // A meteor from the sky falling onto (s.x, s.y): a glowing head with a tapering tail, speeding up as it lands
+        // (the same path as Meteor Call's fireball, drawn small because Danger 4-5 drops many of them).
+        const f = Math.pow(1 - k, 1.8), sc = 0.5 + 0.4 * k;
+        const mx = s.x - 190 * f, my = s.y - 780 * f;
+        const L = 90 + 170 * f, tx = mx - 0.237 * L, ty = my - 0.972 * L;
+        gl.lineStyle(24 * sc, 0xff6a1a, 0.35).lineBetween(mx, my, tx, ty);
+        gl.lineStyle(13 * sc, 0xffb040, 0.6).lineBetween(mx, my, mx + (tx - mx) * 0.7, my + (ty - my) * 0.7);
+        gl.lineStyle(5 * sc, 0xffffff, 0.8).lineBetween(mx, my, mx + (tx - mx) * 0.4, my + (ty - my) * 0.4);
+        gl.fillStyle(0xff7a2a, 0.55).fillCircle(mx, my, 26 * sc);
+        gl.fillStyle(0xffd070, 0.85).fillCircle(mx, my, 15 * sc);
+        gl.fillStyle(0xffffff, 0.9).fillCircle(mx, my, 7 * sc);
+        // The shadow it casts on the ground grows as it comes down.
+        g.fillStyle(0x000000, 0.22 * k * k).fillEllipse(s.x, s.y + 4, s.r1 * 0.8 * k, s.r1 * 0.36 * k);
         break;
       }
       case K_SWEEP: {

@@ -3,15 +3,23 @@
 // Spell Echo (specials.spellEcho): a cast schedules a second copy SPECIAL_RULES.spellEcho.delay s later at `strength` of the
 // ability (castEcho below). While the copy runs, `castScale` shrinks everything that scales with Ability Power; an ability can
 // also define its own `echo(w, p, ab, k)` when "half strength" needs more than that (Tail Whirl).
+//
+// Dash's Stampede is a charge: the cast sets p.abState = {id:'stampede', t, duration, speed, dx, dy, px, py, hit:[], scale}
+// and movement.js moves the player along (dx, dy) at `speed` px/s for `duration` s (it advances abState.t). This file does
+// the rest: it trampling-hits every enemy along the path once per tick (segment from the last position to the current one)
+// and ends the state. Lucky's Jackpot rolls one of four prizes with the world RNG; Hot Streak is a +Damage buff in
+// p.abState that is mirrored into p.stats.damage every tick (syncBuffs), so recomputeStats cannot lose or double it.
 
 import { CHARACTERS } from '../../data/characters.js';
 import { ENEMIES } from '../../data/enemies.js';
 import { SPECIAL_RULES } from '../../data/items.js';
-import { emit, spawnHazard } from '../entities.js';
+import { clampToArena, emit, spawnHazard, spawnPickup } from '../entities.js';
 import { abilityCooldown, abilityCost, abilityMult } from '../stats.js';
+import { range, weighted } from '../rng.js';
 import { hitEnemy, healPlayer } from './damage.js';
 import { applyBurn } from './status.js';
 import { addFuse } from '../hooks.js';
+import { rollDir } from './movement.js';
 
 /** 1 normally; the Spell Echo copy runs with this < 1 (strength of the copy). */
 let castScale = 1;
@@ -163,7 +171,130 @@ export const ABILITIES = {
       }
     },
   },
+
+  // ---- Dash, Lucky ----
+
+  // A charge in the move direction (facing when standing still). movement.js does the moving and counts abState.t; the
+  // player is unhittable for the charge (+ a short grace); every enemy the path touches is hit once and shoved sideways.
+  stampede: {
+    cast(w, p, ab) { startStampede(w, p, ab, castScale); },
+    // Spell Echo: a second, weaker charge (only when the first one is over).
+    echo(w, p, ab, k) { if (!p.abState) startStampede(w, p, ab, k); },
+    tick(w, p, ab) {
+      const s = p.abState;
+      trample(w, p, ab, s);
+      s.px = p.x; s.py = p.y;
+      if (s.t >= s.duration - 1e-6) p.abState = null;
+    },
+  },
+
+  // One of four prizes, picked with the world RNG (jackpotWeights). Only Hot Streak keeps a state (the damage buff).
+  jackpot: {
+    cast(w, p, ab) {
+      const prize = weighted(w.rng, jackpotWeights(ab, p.stats.luck));
+      JACKPOT_PRIZES[prize](w, p, ab);
+      // r = blast radius (coin), t = seconds the effect lasts (lucky: safety, streak: buff); the renderer shows the prize.
+      emit(w, {
+        type: 'jackpot', pid: p.id, o: prize, x: Math.round(p.x), y: Math.round(p.y),
+        r: prize === 'coin' ? ab.radius : 0, t: prize === 'lucky' ? ab.invuln : prize === 'streak' ? ab.streakTime : 0,
+      });
+    },
+    tick(w, p, ab, dt) {
+      const s = p.abState;
+      s.t += dt;
+      if (s.t >= s.time) p.abState = null;
+    },
+  },
 };
+
+const TAU = Math.PI * 2;
+
+/** Squared distance from the point (px, py) to the segment a-b. */
+function segDist2(px, py, ax, ay, bx, by) {
+  const abx = bx - ax, aby = by - ay;
+  const l2 = abx * abx + aby * aby;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / l2)) : 0;
+  const dx = px - (ax + abx * t), dy = py - (ay + aby * t);
+  return dx * dx + dy * dy;
+}
+
+/** Begin a Stampede charge from where the player stands. `scale` < 1 is a Spell Echo copy (damage only). */
+function startStampede(w, p, ab, scale) {
+  const [dx, dy] = rollDir(p.input.mx, p.input.my, p.facing);
+  const end = { x: p.x + dx * ab.distance, y: p.y + dy * ab.distance, r: p.r };
+  clampToArena(end); // walls: movement.js clamps every step, which ends up at the same place as clamping the end point
+  p.abState = { id: 'stampede', t: 0, duration: ab.duration, speed: ab.distance / ab.duration, dx, dy, px: p.x, py: p.y, hit: [], scale };
+  p.iframes = Math.max(p.iframes, ab.duration + (ab.grace || 0));
+  p.rollT = 0; // a roll in progress gives way to the charge
+  if (dx > 0.05) p.facing = 1; else if (dx < -0.05) p.facing = -1;
+  emit(w, { type: 'stampede', pid: p.id, x: Math.round(p.x), y: Math.round(p.y), x2: Math.round(end.x), y2: Math.round(end.y), a: +Math.atan2(dy, dx).toFixed(2) });
+}
+
+/** Hit every enemy the player's body swept over since the last tick, once each, knocking it off the path. */
+function trample(w, p, ab, s) {
+  const ax = s.px, ay = s.py, bx = p.x, by = p.y;
+  const reach = p.r + 16;
+  const len = Math.hypot(bx - ax, by - ay);
+  const dmg = abilityDamage(w, p, ab.damage) * s.scale;
+  for (const e of w.grid.query((ax + bx) / 2, (ay + by) / 2, len / 2 + reach)) {
+    if (e.dead || ENEMIES[e.type].neutral || s.hit.includes(e.id)) continue;
+    if (segDist2(e.x, e.y, ax, ay, bx, by) > (reach + e.r) ** 2) continue;
+    s.hit.push(e.id);
+    const side = (e.x - bx) * -s.dy + (e.y - by) * s.dx >= 0 ? 1 : -1; // which side of the path the enemy is on
+    const kbAngle = Math.atan2(side * s.dx * 0.85 + s.dy * 0.5, -side * s.dy * 0.85 + s.dx * 0.5); // mostly sideways, a bit forward
+    hitEnemy(w, e, dmg, { pid: p.id, kb: ab.knockback, kbAngle, source: 'a' });
+  }
+}
+
+/** Jackpot odds as [prize, weight] pairs, in a fixed order. Lucky Break and Hot Streak get likelier with Luck. */
+export function jackpotWeights(ab, luck) {
+  const o = ab.odds, bonus = Math.max(0, luck || 0) * ab.luckOdds;
+  const up = (base) => Math.max(base, Math.min(ab.luckOddsMax, base + bonus));
+  return [['coin', o.coin], ['lucky', up(o.lucky)], ['amber', o.amber], ['streak', up(o.streak)]];
+}
+
+const JACKPOT_PRIZES = {
+  // Coin Bomb: a big blast around you.
+  coin(w, p, ab) {
+    const dmg = abilityDamage(w, p, ab.damage);
+    for (const e of enemiesNear(w, p.x, p.y, ab.radius)) {
+      hitEnemy(w, e, dmg, { pid: p.id, kb: ab.knockback, kbAngle: Math.atan2(e.y - p.y, e.x - p.x), source: 'a' });
+    }
+  },
+  // Lucky Break: back to full health and unhittable for a moment.
+  lucky(w, p, ab) {
+    healPlayer(w, p, Math.max(1, Math.round((p.stats.maxHp - p.hp) * castScale)), p.id);
+    p.iframes = Math.max(p.iframes, ab.invuln * castScale);
+  },
+  // Amber Shower: amberBase + amberPerWave x wave pickups of 1 amber, scattered around you.
+  amber(w, p, ab) {
+    const n = Math.max(1, Math.round((ab.amberBase + ab.amberPerWave * w.wave) * castScale));
+    for (let i = 0; i < n; i++) {
+      const a = range(w.rng, 0, TAU), d = range(w.rng, 30, ab.amberRadius);
+      const at = { x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, r: 10 };
+      clampToArena(at);
+      const first = w.nextId;
+      const pk = spawnPickup(w, 'amber', at.x, at.y, 1);
+      if (pk.id >= first) { pk.vx = Math.cos(a) * 90; pk.vy = Math.sin(a) * 90; } // a fresh pickup pops outward a little
+    }
+  },
+  // Hot Streak: +Damage % for a few seconds (syncBuffs keeps stats.damage right while it runs).
+  streak(w, p, ab) {
+    const dmg = ab.streak * castScale;
+    // A Spell Echo copy landing on a running Hot Streak refreshes the timer; it never weakens the buff.
+    if (p.abState?.id === 'jackpot') { p.abState.t = 0; p.abState.dmg = Math.max(p.abState.dmg, dmg); return; }
+    p.abState = { id: 'jackpot', t: 0, time: ab.streakTime, dmg };
+  },
+};
+
+/** Per-tick mirror of ability buffs into p.stats (recomputeStats rebuilds stats and knows nothing of Hot Streak). */
+function syncBuffs(p) {
+  const st = p.abState;
+  p.stats.abilityAs = st?.as || 0; // Overdrive's attack speed lasts exactly as long as the buff
+  const want = st?.id === 'jackpot' ? st.dmg : 0; // Hot Streak's damage
+  const have = p.stats.streakDmg || 0;
+  if (want !== have) { p.stats.damage += want - have; p.stats.streakDmg = want; }
+}
 
 export function tryCast(w, p) {
   const ab = CHARACTERS[p.char].ability;
@@ -202,12 +333,12 @@ export function update(w, dt) {
     if (p.abSeen < 0) p.abSeen = p.input.ab;
     const pressed = p.input.ab > p.abSeen;
     p.abSeen = p.input.ab;
-    if (p.downed) { p.abState = null; p.stats.abilityAs = 0; continue; }
+    if (p.downed) { p.abState = null; syncBuffs(p); continue; }
     if (pressed && !tryCast(w, p)) emit(w, { type: 'castFail', pid: p.id });
     if (p.abState) {
       const ab = CHARACTERS[p.char].ability;
       ABILITIES[p.abState.id]?.tick?.(w, p, ab, dt);
     }
-    p.stats.abilityAs = p.abState?.as || 0; // Overdrive's attack speed lasts exactly as long as the buff
+    syncBuffs(p);
   }
 }

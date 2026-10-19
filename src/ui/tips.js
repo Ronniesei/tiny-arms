@@ -65,7 +65,11 @@ export const GLOSSARY = {
   ability: { t: 'Ability (Space)', d: 'Each T-Rex has one special move. It costs mana and has a cooldown.' },
   trait: { t: 'Trait', d: 'A rule that is always on for this T-Rex and changes how it plays.' },
   roll: { t: 'Dodge roll (Shift)', d: () => `A quick dive the way you're moving, invulnerable for ${B.roll.iframes} s. Cooldown ${B.roll.cooldown} s.` },
-  danger: { t: 'Danger', d: 'Difficulty. Higher levels give enemies more HP and damage, and add extra elite waves.' },
+  danger: { t: 'Danger', d: 'Difficulty. Higher levels give enemies more HP and damage, and add extra elite waves. Winning a run on a level opens the next one.' },
+
+  // ---- Progression (challenges, locks) ----
+  challenge: { t: 'Challenge', d: 'A goal that unlocks one new item or weapon when you finish it. Challenges are checked at the end of every run and your progress is saved in this browser. In co-op a run uses everything your mates have unlocked too.' },
+  locked: { t: 'Locked', d: 'Not available yet. Heroes, items, weapons and Danger levels are earned by playing, and anything locked stays out of your runs until you unlock it.' },
 };
 
 // Item tags get generated entries.

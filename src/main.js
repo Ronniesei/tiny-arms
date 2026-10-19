@@ -5,7 +5,7 @@
 //   (?solo=1, ?bot=1 and ?wave=N each skip the menu and lobby and start a solo run; ?danger=N picks the danger level,
 //    default 1 Normal for those auto-started runs and the lobby's remembered choice otherwise)
 //   ?host=1&room=TEST1   ?join=TEST1   &local=1 (BroadcastChannel instead of PeerJS, same browser only)
-//   ?unlockall=1  every hero is pickable (progress is still recorded; heroes are normally unlocked in src/meta/unlocks.js)
+//   ?unlockall=1  every hero, item, weapon and Danger level is open (progress is still recorded; see src/meta/unlocks.js)
 
 import { App } from './app.js';
 import { BootScene } from './render/BootScene.js';
@@ -31,6 +31,8 @@ const params = {
 };
 
 if (q.get('unlockall') === '1') unlocks.setUnlockAll(true);
+// Past play counts: challenges met by lifetime numbers (wins with a hero, totals) are marked done on load.
+try { unlocks.syncChallenges?.(); } catch (e) { console.error(e); }
 const app = new App(params);
 
 addEventListener('error', (e) => app.recordError(e.error || e.message));

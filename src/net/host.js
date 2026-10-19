@@ -11,7 +11,13 @@ import { createWorld, step, skipWave, removePlayer } from '../sim/world.js';
 import { applyShopOp } from '../sim/shop.js';
 import { encodeSnap, decodeSnap, privateView, filterEvents } from './protocol.js';
 import { createHostTransport } from './transport.js';
-import { clampDanger, DEFAULT_DANGER } from '../data/danger.js';
+import { clampDanger, DEFAULT_DANGER, DANGER } from '../data/danger.js';
+
+/** A peer's unlock list, made safe: {items: string[], weapons: string[], maxDanger}. */
+function normUnlocks(u) {
+  const ids = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x.length < 40).slice(0, 400) : []);
+  return { items: ids(u && u.items), weapons: ids(u && u.weapons), maxDanger: clampDanger(u && u.maxDanger !== undefined ? u.maxDanger : DEFAULT_DANGER) };
+}
 
 const DT = 1 / BALANCE.tickRate;
 const SNAP_EVERY = 3;         // ticks (20 Hz)
@@ -21,7 +27,7 @@ const SILENT_AFTER_MS = 6000;  // no message (inputs at 30 Hz, pings every 2 s) 
 const MAX_PLAYERS = 4;
 
 export class HostSession {
-  constructor({ code, name, char, solo = false, local = false, speed = 1, seed, startWave = 1, danger = DEFAULT_DANGER }) {
+  constructor({ code, name, char, solo = false, local = false, speed = 1, seed, startWave = 1, danger = DEFAULT_DANGER, unlocks = null }) {
     this.isHost = true;
     this.myId = 0;
     this.code = code;
@@ -34,6 +40,9 @@ export class HostSession {
     this.error = null;
     this.state = solo ? 'lobby' : 'connecting';
     this.players = [{ id: 0, name: name || 'Host', char: char || 'spike', ready: true, connected: true }];
+    // pid -> {items, weapons, maxDanger} (docs/PROGRESSION.md). The host's own null = everything (tests, tools).
+    // Kept out of this.players so lobby messages stay small.
+    this.unlocksBy = new Map([[0, unlocks ? normUnlocks(unlocks) : null]]);
     this.conns = new Map();       // pid -> conn
     this.lastHeard = new Map();   // pid -> performance.now() of the last message
     this.inputs = {};             // pid -> latest input
@@ -68,10 +77,39 @@ export class HostSession {
   phase() { return this.world ? this.world.phase : this.state; }
 
   lobby() {
-    return { code: this.code, isHost: true, myId: this.myId, players: this.players.map((p) => ({ ...p })), local: this.local, danger: this.danger };
+    return { code: this.code, isHost: true, myId: this.myId, players: this.players.map((p) => ({ ...p })), local: this.local, danger: this.danger, maxDanger: this.teamMaxDanger() };
   }
 
-  broadcastLobby() { this.broadcast({ t: 'lobby', code: this.code, players: this.players, danger: this.danger }); }
+  broadcastLobby() { this.broadcast({ t: 'lobby', code: this.code, players: this.players, danger: this.danger, maxDanger: this.teamMaxDanger() }); }
+
+  // ---- unlocks (docs/PROGRESSION.md): the team gets the best of everyone's ----
+
+  /** The highest danger anyone in the lobby has unlocked. */
+  teamMaxDanger() {
+    let m = DEFAULT_DANGER;
+    for (const p of this.players) {
+      const u = this.unlocksBy.get(p.id);
+      if (u === null && p.id === 0) return DANGER.length - 1;
+      if (u) m = Math.max(m, u.maxDanger);
+    }
+    return m;
+  }
+
+  /** The run's item and weapon pool: the union of everyone's unlocks (undefined = everything). */
+  teamPool() {
+    if (this.unlocksBy.get(0) === null) return undefined;
+    const items = new Set(), weapons = new Set();
+    for (const p of this.players) {
+      const u = this.unlocksBy.get(p.id);
+      if (!u) continue;
+      for (const id of u.items) items.add(id);
+      for (const id of u.weapons) weapons.add(id);
+    }
+    return { items: [...items], weapons: [...weapons] };
+  }
+
+  /** This browser's unlocks changed (after a run): use them from the next run on. */
+  setUnlocks(u) { this.unlocksBy.set(0, u ? normUnlocks(u) : null); this.broadcastLobby(); }
 
   broadcast(msg) {
     for (const conn of this.conns.values()) this.sendTo(conn, msg);
@@ -132,6 +170,7 @@ export class HostSession {
     switch (m.t) {
       case 'hello':
         if (lp) { lp.name = this.uniqueName(String(m.name || lp.name).slice(0, 16), pid); if (m.char) lp.char = m.char; }
+        if (lp && m.unlocks) this.unlocksBy.set(pid, normUnlocks(m.unlocks));
         this.broadcastLobby();
         break;
       case 'pick':
@@ -171,7 +210,7 @@ export class HostSession {
   pick(char) { if (!this.world) { this.players[0].char = char; this.broadcastLobby(); } }
   setReady() {}
   /** Host picks the danger level (lobby only); mates see it read-only. */
-  setDanger(d) { if (!this.world) { this.danger = clampDanger(d); this.broadcastLobby(); } }
+  setDanger(d) { if (!this.world) { this.danger = Math.min(clampDanger(d), this.teamMaxDanger()); this.broadcastLobby(); } }
 
   startRun() {
     const seed = this.seed ?? Math.floor(Math.random() * 2 ** 31);
@@ -183,7 +222,8 @@ export class HostSession {
       const lp = this.players.find((p) => p.id === i);
       list.push(lp ? { id: i, name: lp.name, char: lp.char } : { id: i, name: '-', char: 'spike', gone: true });
     }
-    this.world = createWorld({ seed, players: list, startWave: this.startWave, danger: this.danger });
+    this.danger = Math.min(this.danger, this.teamMaxDanger()); // a mate who unlocked it may have left
+    this.world = createWorld({ seed, players: list, startWave: this.startWave, danger: this.danger, pool: this.teamPool() });
     for (const p of list) if (p.gone) removePlayer(this.world, p.id);
     this.acc = 0;
     this.localEvents = [];

@@ -19,6 +19,9 @@ import { levelRerollCost } from '../sim/levelup.js';
 import { abilityCost } from '../sim/stats.js';
 import { CHARACTERS } from '../data/characters.js';
 
+/** The HUD's "HERD x": nearby mates plus Herd Horn's extra one (damage.js herdOf), capped like the bonus. */
+const herdShown = (pl) => (pl.downed || pl.gone ? 0 : Math.min(BALANCE.coop.herdMax, (pl.herd || 0) + (pl.specials?.herdHorn || 0)));
+
 const TELE_KINDS = ['flash', 'line', 'circle'];
 // Projectile, hazard and summon kinds are sent as strings (low volume, no index table to keep in sync).
 
@@ -41,7 +44,7 @@ export function encodeSnap(w) {
       pl.id, r1(pl.x), r1(pl.y), Math.ceil(pl.hp), pl.stats.maxHp, r1(pl.mana), pl.stats.maxMana, flags,
       r1((pl.reviveT / BALANCE.revive.time) * 100), r1(moveSpeed(pl.stats) * (pl.abState?.speedMult || 1)),
       pl.amber, pl.level, pl.weapons.map(weaponCode), pl.lastSeq, CHARACTER_IDS.indexOf(pl.char), pl.abCd > 0 ? r1(pl.abCd * 10) : 0,
-      abilityCost(pl, CHARACTERS[pl.char].ability.cost), pl.rollCd > 0 ? r1(pl.rollCd * 10) : 0, pl.herd || 0,
+      abilityCost(pl, CHARACTERS[pl.char].ability.cost), pl.rollCd > 0 ? r1(pl.rollCd * 10) : 0, herdShown(pl),
     ]);
   }
   const e = [];

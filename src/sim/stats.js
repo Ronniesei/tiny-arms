@@ -23,6 +23,10 @@ export const SPECIAL_KEYS = [
   'killBoom', 'rollBomb', 'blastSize', 'blastDmg', 'extraShots', 'rangedMult', 'bounceHit', 'pierce', 'pierceFalloff',
   'clutch', 'summonDmg', 'ownDmg', 'critHeal', 'chainZap', 'critMult', 'waveAmber', 'hoard', 'vacuum', 'spellEcho',
   'killMana', 'shockwave', 'meleeKb', 'bleed', 'halfHp', 'berserkAs',
+  // generic conversions read in recomputeStats (docs/PROGRESSION.md)
+  'speedToDamage', 'luckToCrit', 'rollCdCut', 'critAmber', 'abCdCut',
+  // unlockable items (src/data/items.js "Unlockable items", code in hooks.js / damage.js)
+  'rollBowl', 'adrenaline', 'thorns', 'herdHorn', 'fossilShield', 'emberBurst', 'secondWind',
 ];
 
 export function aggregateSpecials(items) {
@@ -148,6 +152,19 @@ export function recomputeStats(player) {
   s.kindleDps = t?.kindleDps ?? 0; s.kindleTime = t?.kindleTime ?? 0;
   s.burnMult = t?.burnMult ?? 1;                            // Ash: burn damage (damage.js hitEnemy)
   s.abilityAs = player.abState?.as || 0;                    // Overdrive: attack speed while it runs (abilities.js keeps it fresh)
+  // Generic conversions for items (special.*) and hero traits (trait.*), docs/PROGRESSION.md:
+  //   speedToDamage  +x Damage % per +1 Speed %        (Momentum Horn, Dash's Momentum)
+  //   luckToCrit     +x Crit Chance % per +1 Luck      (Loaded Dice)
+  //   rollCdCut      dodge roll cooldown -x (0.25 = 25% shorter, capped at 60%; movement.js)
+  //   critAmber      chance a crit drops 1 amber (hooks.js onHit)
+  //   abCdCut        Space ability cooldown -x (0.25 = 25% shorter, capped at 50%; abilities.js)
+  const toDmg = (t?.speedToDamage ?? 0) + (sp.speedToDamage || 0);
+  if (toDmg > 0 && s.speed > 0) s.damage += Math.round(s.speed * toDmg);
+  const toCrit = (t?.luckToCrit ?? 0) + (sp.luckToCrit || 0);
+  if (toCrit > 0 && s.luck > 0) s.critChance += Math.round(s.luck * toCrit);
+  s.rollCdCut = Math.min(0.6, (t?.rollCdCut ?? 0) + (sp.rollCdCut || 0));
+  s.critAmber = Math.min(1, (t?.critAmber ?? 0) + (sp.critAmber || 0));
+  s.abCdCut = Math.min(0.5, (t?.abCdCut ?? 0) + (sp.abCdCut || 0));
   const prevMax = player.stats.maxHp;
   player.stats = s;
   player.specials = sp;
@@ -216,7 +233,7 @@ export function abilityCost(player, baseCost) {
 
 /** Cooldown in seconds of the player's ability (Sparky's Spark trait shortens it). */
 export function abilityCooldown(player, baseCooldown) {
-  return baseCooldown * (CHARACTERS[player?.char]?.trait?.abilityCooldownMult ?? 1);
+  return baseCooldown * (CHARACTERS[player?.char]?.trait?.abilityCooldownMult ?? 1) * (1 - (player?.stats?.abCdCut || 0));
 }
 
 export function abilityMult(stats) {

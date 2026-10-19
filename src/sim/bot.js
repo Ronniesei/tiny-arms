@@ -167,6 +167,8 @@ export function botInput(src, pid, bs, time, opt = {}) {
     else if (ab.id === 'overdrive') want = close >= 2 || nd < 180;           // a buff: use it when a fight is on
     else if (ab.id === 'overclock') want = src.enemies.length >= 5;
     else if (ab.id === 'gold_rush') want = amberLoose >= 6;                   // only worth it with amber on the floor
+    else if (ab.id === 'stampede') want = close >= 3 || inDanger;             // plough through a crowd, or dodge a telegraph (unhittable)
+    else if (ab.id === 'jackpot') want = close >= 2 || hpFrac < 0.5;          // any prize helps in a fight; Lucky Break heals
     else want = close >= 3;
     // Don't sit on full mana: a person spends it whenever something is in reach.
     const full = me.mana >= (me.maxMana ?? me.stats?.maxMana ?? 100) * 0.9;
@@ -193,6 +195,8 @@ const STAT_PRIORITY = {
   goldie: ['harvesting', 'rangedDamage', 'maxHp', 'attackSpeed', 'armor', 'luck', 'damage'],      // amber in, damage out
   bolt: ['rangedDamage', 'abilityPower', 'attackSpeed', 'maxHp', 'armor', 'damage', 'manaRegen'], // summons scale with these
   ash: ['abilityPower', 'rangedDamage', 'maxHp', 'armor', 'attackSpeed', 'damage', 'critChance'],  // burn scales with Ability Power
+  dash: ['speed', 'attackSpeed', 'damage', 'meleeDamage', 'maxHp', 'dodge', 'critChance'],          // Speed turns into damage (Momentum)
+  lucky: ['luck', 'critChance', 'damage', 'rangedDamage', 'maxHp', 'harvesting', 'armor'],         // Luck turns into crits (Lucky Charm)
 };
 
 function itemScore(me, id) {
@@ -216,7 +220,7 @@ function weaponScore(me, id, tier) {
   let s = tier * 3;
   const owned = me.weapons.filter((x) => x.wid === id);
   if (owned.some((x) => x.tier === tier && tier < 4)) s += 4; // merge fodder
-  const melee = me.char === 'brutus' || me.char === 'spike';
+  const melee = me.char === 'brutus' || me.char === 'spike' || me.char === 'dash';
   if ((def.kind === 'melee') === melee) s += 2;
   const cls = me.weapons.map((x) => WEAPONS[x.wid]?.cls);
   if (cls.includes(def.cls)) s += 1.5;

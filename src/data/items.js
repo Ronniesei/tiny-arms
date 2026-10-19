@@ -102,6 +102,45 @@ export const ITEMS = {
   // ---- Tier 4 ----
   glass_jaw:      { id: 'glass_jaw',      name: 'Glass Jaw',      tier: 4, price: 88, icon: 'i_glass_jaw',      tags: ['cursed', 'damage'], stats: { damage: 40 },
     special: { halfHp: 1 }, limit: 1, desc: 'Your max HP is cut in half. Do not get hit.' },
+
+  // ======== Unlockable items (challenge rewards, docs/PROGRESSION.md): speed, luck, defense and explosive builds ========
+  // (numbers for the special ones: SPECIAL_RULES below; code: hooks.js, damage.js, weapons.js, stats.js)
+
+  // ---- Tier 1 ----
+  wind_feather:   { id: 'wind_feather',   name: 'Wind Feather',   tier: 1, price: 15, icon: 'i_wind_feather',   tags: ['speed', 'defense'], stats: { speed: 6, dodge: 5 }, limit: 4 },
+  nest_egg:       { id: 'nest_egg',       name: 'Nest Egg',       tier: 1, price: 15, icon: 'i_nest_egg',       tags: ['greed'], stats: { harvesting: 9, speed: -3 } },
+  cave_painting:  { id: 'cave_painting',  name: 'Cave Painting',  tier: 1, price: 15, icon: 'i_cave_painting',  tags: ['damage', 'mana'], stats: { damage: 6, abilityPower: 8 } },
+
+  // ---- Tier 2 ----
+  rolling_stone:  { id: 'rolling_stone',  name: 'Rolling Stone',  tier: 2, price: 34, icon: 'i_rolling_stone',  tags: ['speed', 'melee'], stats: { speed: 5 },
+    special: { rollCdCut: 0.25, rollBowl: 1 }, limit: 2, desc: 'Dodge roll cooldown -25%. Rolling through enemies bowls them over for damage and knockback.' },
+  adrenaline_gland: { id: 'adrenaline_gland', name: 'Adrenaline Gland', tier: 2, price: 34, icon: 'i_adrenaline_gland', tags: ['speed', 'damage'], stats: { speed: 3 },
+    special: { adrenaline: 1 }, limit: 1, desc: 'After a dodge roll: +20% damage and +25% attack speed for 2 s.' },
+  quill_coat:     { id: 'quill_coat',     name: 'Quill Coat',     tier: 2, price: 32, icon: 'i_quill_coat',     tags: ['defense'], stats: { armor: 2, speed: -4 },
+    special: { thorns: 1.5 }, limit: 3, desc: 'An enemy that hits you in contact takes 150% of that hit back (at least 3).' },
+  four_leaf_fern: { id: 'four_leaf_fern', name: 'Four-Leaf Fern', tier: 2, price: 30, icon: 'i_four_leaf_fern', tags: ['luck', 'sustain'], stats: { luck: 18, hpRegen: 2 } },
+  herd_horn:      { id: 'herd_horn',      name: 'Herd Horn',      tier: 2, price: 30, icon: 'i_herd_horn',      tags: ['defense'], stats: { maxHp: 4, hpRegen: 1 },
+    special: { herdHorn: 1 }, limit: 1, desc: 'Your herd bonus counts one extra mate, even when you play alone (+8% damage, +1 armor).' },
+  ember_heart:    { id: 'ember_heart',    name: 'Ember Heart',    tier: 2, price: 34, icon: 'i_ember_heart',    tags: ['explosive'], stats: { abilityPower: 8 },
+    special: { emberBurst: 1 }, limit: 3, desc: 'Enemies that die while burning burst in a small explosion.' },
+
+  // ---- Tier 3 ----
+  momentum_horn:  { id: 'momentum_horn',  name: 'Momentum Horn',  tier: 3, price: 54, icon: 'i_momentum_horn',  tags: ['speed', 'damage'], stats: { speed: 8 },
+    special: { speedToDamage: 0.5 }, limit: 2, desc: 'You gain +1% damage for every 2% Speed you have.' },
+  loaded_dice:    { id: 'loaded_dice',    name: 'Loaded Dice',    tier: 3, price: 52, icon: 'i_loaded_dice',    tags: ['luck', 'crit'], stats: { luck: 20 },
+    special: { luckToCrit: 0.1 }, limit: 2, desc: 'Every 10 Luck gives you +1% crit chance.' },
+  fossil_shield:  { id: 'fossil_shield',  name: 'Fossil Shield',  tier: 3, price: 54, icon: 'i_fossil_shield',  tags: ['defense'], stats: { armor: 2, speed: -5 },
+    special: { fossilShield: 1 }, limit: 1, desc: 'Blocks one hit completely, then needs 15 s to recharge.' },
+  second_wind:    { id: 'second_wind',    name: 'Second Wind',    tier: 3, price: 56, icon: 'i_second_wind',    tags: ['sustain'], stats: { maxHp: 4 },
+    special: { secondWind: 1 }, limit: 1, desc: 'Once per wave, a hit that would down you leaves you at 1 HP and invulnerable for 1 s.' },
+
+  // ---- Tier 4 ----
+  jackpot_gem:    { id: 'jackpot_gem',    name: 'Jackpot Gem',    tier: 4, price: 90, icon: 'i_jackpot_gem',    tags: ['luck', 'greed'], stats: { luck: 30, harvesting: 8 },
+    special: { critAmber: 0.08 }, limit: 2, desc: 'Crits have an 8% chance to drop 1 amber.' },
+  big_bang:       { id: 'big_bang',       name: 'Big Bang',       tier: 4, price: 96, icon: 'i_big_bang',       tags: ['explosive'], stats: { abilityPower: 20 },
+    special: { blastSize: 0.4, blastDmg: 0.2, killBoom: 0.1 }, limit: 1, desc: '+40% explosion size and +20% damage for all your explosions. Kills have a 10% chance to explode.' },
+  time_amber:     { id: 'time_amber',     name: 'Time Amber',     tier: 4, price: 92, icon: 'i_time_amber',     tags: ['mana'], stats: { maxMana: 40, manaRegen: 1 },
+    special: { abCdCut: 0.25 }, limit: 2, desc: 'Your ability cooldown is 25% shorter.' },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS);
@@ -147,6 +186,23 @@ export const SPECIAL_RULES = {
   bleed: { time: 2, maxStacks: 8 },
   // Piggy Egg and Amber Vacuum: the wave-end amber also pays XP like Harvesting; the vacuum gives `vacuumXp` XP per pickup per copy.
   vacuumXp: 1,
+
+  // ---- unlockable items ----
+  // Rolling Stone (hooks.js update): each enemy the roll passes through, once per roll, takes
+  // (dmg + melee x Melee Damage) x (1 + perWave x (wave - 1)) x Damage % and `kb` knockback.
+  rollBowl: { dmg: 8, melee: 1.5, perWave: 0.14, kb: 380 },
+  // Adrenaline Gland (hooks.js onRoll sets the timer; damage.js hitEnemy and weapons.js cooldownOf read it): for `time` s after a roll,
+  // damage x (1 + damage) and +attackSpeed % attack speed.
+  adrenaline: { time: 2, damage: 0.2, attackSpeed: 25 },
+  // Quill Coat (damage.js hitPlayer): a contact hit reflects (hit before armor x thorns), at least `min`, with `kb` knockback.
+  thorns: { min: 3, kb: 100 },
+  // Fossil Shield (damage.js hitPlayer): blocks one whole hit, `cooldown` s to recharge (it is ready at the start of every wave),
+  // `iframes` s of invulnerability after the block.
+  fossilShield: { cooldown: 15, iframes: 0.5 },
+  // Second Wind (damage.js hitPlayer): once per wave a lethal hit leaves 1 HP and `iframes` s of invulnerability.
+  secondWind: { iframes: 1 },
+  // Ember Heart (hooks.js onKill): an enemy that dies burning explodes in `radius` px for dmg x (1 + perWave x (wave - 1)) x Damage %.
+  emberBurst: { radius: 80, dmg: 12, perWave: 0.14, maxDepth: 2 },
 };
 
 /** Loot crates (src/sim/crates.js). */

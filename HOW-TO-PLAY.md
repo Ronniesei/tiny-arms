@@ -37,6 +37,14 @@ Playing alone: click **Play solo**.
 | Fern | Healer: HP regen, ability power | **Healing Pulse:** heals everyone nearby, blasts enemies back, speeds up revives |
 | Spike | Damage: hits hard and fast, fragile | **Tail Whirl:** spins and smacks everything around him |
 | Sparky | Support: long range, more mana | **Meteor Call:** drops a meteor on the biggest crowd and leaves the ground burning |
+| Dash (unlock) | Speedster: fast, damage grows with speed | **Stampede:** charges forward through enemies |
+| Lucky (unlock) | Gambler: luck, crits drop amber | **Jackpot:** a random prize: blast, heal, amber shower or damage boost |
+
+## Unlocks: why play again
+- **Danger levels:** win a run to open the next one, up to Apocalypse (level 5). Levels 4 and 5 drop meteors on the arena.
+- **Challenges** (menu, Challenges button): 28 goals, each unlocks a new item or weapon for the shop. Your progress is saved in your browser.
+- **More T-Rexes:** Pip, Goldie, Bolt, Ash, Dash and Lucky are earned by playing. The Challenges screen shows how close you are.
+- Playing together, the run uses everyone's unlocks, and the host can pick the highest Danger anyone has opened.
 
 ## Co-op
 - At 0 HP you're **down**, not dead. A mate standing next to you for 3 seconds revives you (Fern makes it much faster).

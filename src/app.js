@@ -7,7 +7,7 @@ import { ClientSession } from './net/client.js';
 import { makeRoomCode } from './net/transport.js';
 import { Keyboard } from './input.js';
 import { botInput, botShopOp, createBotState } from './sim/bot.js';
-import { isUnlocked, recordRun, runFromResult } from './meta/unlocks.js';
+import { isUnlocked, recordRun, runFromResult, unlockedContent, maxDangerUnlocked } from './meta/unlocks.js';
 
 const SETTINGS_KEY = 'tinyarms.settings';
 
@@ -39,7 +39,7 @@ export class App {
     this.endSession();
     const s = new HostSession({
       code: 'SOLO', name: this.settings.name, char: this.resolveChar(char || this.params.char || this.settings.char),
-      solo: true, speed: this.params.speed, seed: this.params.seed, startWave: this.params.wave,
+      solo: true, speed: this.params.speed, seed: this.params.seed, startWave: this.params.wave, unlocks: this.myUnlocks(),
     });
     this.session = s;
     await s.open();
@@ -51,7 +51,7 @@ export class App {
     this.endSession();
     const s = new HostSession({
       code: code || makeRoomCode(), name: this.settings.name, char: this.resolveChar(this.params.char || this.settings.char),
-      local: this.params.local, speed: this.params.speed, seed: this.params.seed, startWave: this.params.wave,
+      local: this.params.local, speed: this.params.speed, seed: this.params.seed, startWave: this.params.wave, unlocks: this.myUnlocks(),
     });
     this.session = s;
     await s.open();
@@ -60,7 +60,10 @@ export class App {
 
   async join(code) {
     this.endSession();
-    const s = new ClientSession({ code: code.toUpperCase().trim(), name: this.settings.name, char: this.resolveChar(this.params.char || this.settings.char), local: this.params.local });
+    const s = new ClientSession({
+      code: code.toUpperCase().trim(), name: this.settings.name, char: this.resolveChar(this.params.char || this.settings.char),
+      local: this.params.local, unlocks: this.myUnlocks(),
+    });
     this.session = s;
     await s.open();
     return s;
@@ -143,7 +146,18 @@ export class App {
     try {
       const run = runFromResult(res, s.myId);
       if (run) recordRun(run);
+      s.setUnlocks?.(this.myUnlocks()); // new items, weapons or Danger count from the next run on
     } catch (e) { this.recordError(e); }
+  }
+
+  /** This browser's unlocks for the session: the run pool and Danger cap (docs/PROGRESSION.md). */
+  myUnlocks() {
+    try {
+      return { ...unlockedContent(), maxDanger: maxDangerUnlocked() };
+    } catch (e) {
+      this.recordError(e);
+      return null; // the host then offers everything rather than nothing
+    }
   }
 
   recordError(e) {

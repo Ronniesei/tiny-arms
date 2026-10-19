@@ -7,7 +7,9 @@
 //   'lob'        arcing shell, explodes at the target and leaves fire.  flight, radius[], fireDps[], fireDur[], fireR
 //   'bounce'     projectile that ricochets off arena walls, explodes on the first enemy hit.  bounces[], radius[]
 //   'beam'       instant line through every enemy in range. width (half-width px)
-//   'drone'      keeps one flying summon that dives at enemies.  diveSpeed, orbitSpeed
+//   'boomerang'  thrown projectile that flies out to its range and back, hitting every enemy on both legs.  projectile, speed
+//   'drone'      keeps one flying summon that dives at enemies.  diveSpeed, orbitSpeed;  count[] (default 1) and summon (kind
+//                string, default 'ptero') make swarms of them (Beetle Jar)
 //   'turret'     keeps count[tier] stationary summons that shoot.  projectile, speed, count[]
 // range: px from the player at 0% Range (melee gets half the Range stat).
 // scaling: weapon damage = (dmg[tier] + sum(scaling[stat] * stat)) * (1 + Damage%/100).
@@ -122,6 +124,33 @@ export const WEAPONS = {
     range: 420, width: 12, knockback: 20,
     scaling: { rangedDamage: 0.8 }, critChance: 8, critMult: 1.5,
     desc: 'An instant beam that burns through every enemy in line.',
+  },
+
+  // ---- Unlockable weapons (challenge rewards / hero starting weapon, docs/PROGRESSION.md). Added last: the network
+  // sends a weapon as its index in this list, so the order of the older weapons must not change. ----
+  raptor_claws: {
+    id: 'raptor_claws', name: 'Raptor Claws', cls: 'primal', kind: 'melee', behaviour: 'swing',
+    price: 21, sprite: 'w_raptor_claws',
+    dmg: [4, 7, 11, 17], cooldown: [0.4, 0.36, 0.32, 0.28],
+    range: 110, arc: 80, knockback: 30,
+    scaling: { meleeDamage: 0.6 }, critChance: 20, critMult: 2,
+    desc: 'Lightning-fast slashes that crit a lot. Short reach.',
+  },
+  boomerang_bone: {
+    id: 'boomerang_bone', name: 'Boomerang Bone', cls: 'hunter', kind: 'ranged', behaviour: 'boomerang',
+    price: 23, sprite: 'w_boomerang_bone', projectile: 'p_boomerang',
+    dmg: [4, 7, 12, 19], cooldown: [1.2, 1.1, 1.0, 0.9],
+    range: 380, speed: 620, projRadius: 15, knockback: 20,
+    scaling: { rangedDamage: 0.8 }, critChance: 6, critMult: 2,
+    desc: 'Flies out, turns and flies back, hitting every enemy on the way out and again on the way back.',
+  },
+  beetle_jar: {
+    id: 'beetle_jar', name: 'Beetle Jar', cls: 'swarm', kind: 'ranged', behaviour: 'drone',
+    price: 24, sprite: 'w_beetle_jar', summon: 's_beetle',
+    dmg: [4, 6, 8, 12], cooldown: [1.1, 1.0, 0.9, 0.85],
+    range: 320, diveSpeed: 860, orbitSpeed: 3.4, knockback: 20, count: [2, 2, 3, 3],
+    scaling: { rangedDamage: 0.5, abilityPower: 0.12 }, critChance: 5, critMult: 1.5,
+    desc: 'Frees scuttling beetles that circle you and dart at enemies. Three beetles from tier III.',
   },
 };
 

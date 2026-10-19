@@ -28,7 +28,8 @@ function startRoll(w, p, mx, my) {
   const R = BALANCE.roll;
   [p.rollDx, p.rollDy] = rollDir(mx, my, p.facing);
   p.rollT = R.duration;
-  p.rollCd = R.cooldown;
+  p.rollCd = R.cooldown * (1 - (p.stats.rollCdCut || 0)); // items and traits can shorten it (stats.js)
+  p.score.rolls = (p.score.rolls || 0) + 1;
   p.iframes = Math.max(p.iframes, R.iframes);
   if (p.rollDx > 0.05) p.facing = 1; else if (p.rollDx < -0.05) p.facing = -1;
   emit(w, { type: 'roll', pid: p.id, x: Math.round(p.x), y: Math.round(p.y), a: +Math.atan2(p.rollDy, p.rollDx).toFixed(2) });
@@ -89,6 +90,17 @@ export function update(w, dt) {
     const speed = moveSpeed(p.stats) * (p.abState?.speedMult || 1);
     // Dodge roll: dr is a press counter like the ability key.
     const dr = p.input.dr || 0;
+    // Dash's Stampede: a straight charge that ignores the move input and the roll (abilities.js sets up p.abState and does the
+    // hitting). The last step is trimmed so the charge covers exactly `distance` px whatever the tick length.
+    const charge = p.abState?.id === 'stampede' ? p.abState : null;
+    if (charge) {
+      p.drSeen = dr;
+      const step = Math.max(0, Math.min(dt, charge.duration - charge.t));
+      charge.t += step;
+      predictMove(p, charge.dx, charge.dy, charge.speed, step);
+      p.moving = true;
+      continue;
+    }
     if (dr > p.drSeen && p.rollCd <= 0) startRoll(w, p, mx, my);
     p.drSeen = dr;
     if (p.rollT > 0) {

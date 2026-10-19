@@ -4,8 +4,26 @@
 // The renderer draws enemy hazards as red warning areas during their delay.
 // Register new kinds in HAZARD_KINDS: { fire?(w, h), tick?(w, h, dt) }.
 
+// Danger 4 and 5 add a meteor shower (see `meteors` in src/data/danger.js): meteorShower() below spawns 'skyfall' hazards
+// during waves. Each is a red warning circle (enemy-owned hazard, drawn like any other) that lands SKYFALL.delay s later,
+// hurts the players inside, and hurts the enemies inside three times as much (no player gets credit for those kills).
+// Events: 'skyWarn' {x, y, r, d} when one is called (the renderer draws the fireball falling for d s), and 'skyfall'
+// {x, y, r} when it lands (the hazard's `ev`).
+
+import { dangerOf } from '../../data/danger.js';
+import { ENEMIES } from '../../data/enemies.js';
 import { hitEnemy, hitPlayer } from './damage.js';
-import { emit, spawnHazard } from '../entities.js';
+import { clampToArena, emit, spawnHazard } from '../entities.js';
+import { next, pick, range } from '../rng.js';
+
+export const SKYFALL = {
+  first: 3,        // s: no meteor in the first seconds of a wave (the first one lands no earlier than max(first, every))
+  delay: 1.2,      // s of red warning before it lands
+  scatter: 120,    // px: lands up to this far from the player it picked
+  enemyMult: 3,    // enemies inside take this times the players' damage
+  dur: 0.35,       // s the impact flash stays
+  kb: 180,         // knockback on enemies hit
+};
 
 function playersIn(w, x, y, r) {
   return w.players.filter((p) => !p.gone && !p.downed && (p.x - x) ** 2 + (p.y - y) ** 2 <= (r + p.r * 0.6) ** 2);
@@ -37,6 +55,21 @@ export const HAZARD_KINDS = {
     },
   },
 
+  // Enemy side (Danger 4-5): a meteor from the sky. Players inside (circle edge + a little of their body) take h.dmg,
+  // enemies inside take SKYFALL.enemyMult times that. Bushes are left alone.
+  skyfall: {
+    fire(w, h) {
+      for (const p of w.players) {
+        if (p.gone || p.downed) continue;
+        if ((p.x - h.x) ** 2 + (p.y - h.y) ** 2 <= (h.r + p.r * 0.3) ** 2) hitPlayer(w, p, h.dmg, { source: 'meteor' });
+      }
+      for (const e of w.grid.query(h.x, h.y, h.r)) {
+        if (e.dead || ENEMIES[e.type].neutral) continue;
+        hitEnemy(w, e, h.dmg * SKYFALL.enemyMult, { kb: SKYFALL.kb, kbAngle: Math.atan2(e.y - h.y, e.x - h.x), source: 'hazard' });
+      }
+    },
+  },
+
   // Player: meteor impact; damages enemies, then leaves burning ground.
   meteor: {
     fire(w, h) {
@@ -60,7 +93,30 @@ export const HAZARD_KINDS = {
   },
 };
 
+/**
+ * Danger 4-5: call a meteor on a random live player every `every` s of the wave (see SKYFALL for the rest).
+ * The next call time is kept on the wave director (w.dir.meteorT, in wave seconds), so every wave starts fresh.
+ */
+export function meteorShower(w) {
+  const M = dangerOf(w).meteors;
+  const d = w.dir;
+  if (!M || !d || w.phase !== 'wave') return;
+  if (d.meteorT === undefined) d.meteorT = Math.max(SKYFALL.first, M.every);
+  if (w.waveTime < d.meteorT) return;
+  d.meteorT += M.every;
+  const live = w.players.filter((p) => !p.gone && !p.downed);
+  if (!live.length) return;
+  const target = pick(w.rng, live);
+  const a = range(w.rng, 0, Math.PI * 2), dist = SKYFALL.scatter * Math.sqrt(next(w.rng));
+  const at = { x: target.x + Math.cos(a) * dist, y: target.y + Math.sin(a) * dist, r: 20 };
+  clampToArena(at);
+  const dmg = M.dmg + M.perWave * Math.max(0, w.wave - 1);
+  spawnHazard(w, { kind: 'skyfall', owner: 'enemy', x: at.x, y: at.y, r: M.r, delay: SKYFALL.delay, dur: SKYFALL.dur, dmg, ev: 'skyfall' });
+  emit(w, { type: 'skyWarn', x: Math.round(at.x), y: Math.round(at.y), r: M.r, d: SKYFALL.delay });
+}
+
 export function update(w, dt) {
+  meteorShower(w);
   for (const h of w.hazards) {
     if (h.dead) continue;
     h.t += dt;

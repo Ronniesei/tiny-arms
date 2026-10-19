@@ -1,5 +1,6 @@
-// End of run: VICTORY / EXTINCT banner, scoreboard with banter titles (badge + caption), a "Builds" recap
-// (each player's weapons with tier and damage dealt, plus items), play again.
+// End of run: VICTORY / EXTINCT banner, an "Unlocked!" panel (new heroes, finished challenges with their reward, newly open Danger
+// levels) and "Next goals", scoreboard with banter titles (badge + caption), a "Builds" recap (each player's weapons with tier and
+// damage dealt, plus items), play again.
 
 import { BALANCE } from '../data/balance.js';
 import { CHARACTERS } from '../data/characters.js';
@@ -7,9 +8,11 @@ import { DANGER } from '../data/danger.js';
 import { ITEMS } from '../data/items.js';
 import { WEAPONS } from '../data/weapons.js';
 import { PLAYER_COLORS_CSS } from '../render/art.js';
-import { lastNewlyUnlocked } from '../meta/unlocks.js';
+import { CHALLENGES } from '../data/challenges.js';
+import { lastUnlocks } from '../meta/unlocks.js';
 import { tip } from './tips.js';
 import { ROMAN, TIER_CLASS, TIER_NAMES, esc } from './describe.js';
+import { rewardInfo, rewardLines, rewardTip, nextGoalsHtml } from './collection.js';
 
 const SPR = (key) => `assets/sprites/${key}.svg`;
 const IMG_ERR = `onerror="this.style.visibility='hidden'"`;
@@ -87,16 +90,52 @@ function buildsHtml(rows) {
 }
 
 /** "NEW HERO UNLOCKED: Pip!" for every hero this browser's last recorded run unlocked (src/meta/unlocks.js, app.js trackRun). */
-export function unlockPanels() {
-  return lastNewlyUnlocked().filter((id) => CHARACTERS[id]).map((id) => {
+export function unlockPanels(heroes = lastUnlocks().heroes, firstIndex = 0) {
+  return heroes.filter((id) => CHARACTERS[id]).map((id, i) => {
     const c = CHARACTERS[id];
-    return `<div class="unlocked" style="--hc:${c.color}" role="status" data-tip-text="${esc(`${c.name} is now unlocked in this browser. Pick ${c.name} in the lobby for your next run.`)}">
+    return `<div class="unlocked" style="--hc:${c.color};--i:${firstIndex + i}" role="status" data-tip-text="${esc(`${c.name} is now unlocked in this browser. Pick ${c.name} in the lobby for your next run.`)}">
       <span class="uport"><img src="${SPR(`h_${id}`)}" ${IMG_ERR} alt=""></span>
       <div class="utext"><b class="uline"><span class="ukick">NEW HERO UNLOCKED:</span> <span class="uname">${esc(c.name)}!</span></b>
         <small>${esc(c.role)} · ${esc(c.trait?.name || '')}: ${esc(c.trait?.desc || c.blurb)}</small>
         <small class="uhint">${esc(c.name)} is waiting in the lobby for your next run.</small></div>
     </div>`;
   }).join('');
+}
+
+/** A finished challenge: its reward's icon, "Roll Model done:" and "Rolling Stone unlocked". */
+function challengeCard(c, i) {
+  const r = rewardInfo(c.reward);
+  const effect = rewardLines(c.reward).slice(0, 2).join(' · ');
+  return `<div class="ucard chal ${TIER_CLASS[r.tier - 1]}" style="--i:${i}" role="status" data-tip-text="${esc(rewardTip(c, true))}">
+      <span class="uicon"><img src="${SPR(r.icon)}" ${IMG_ERR} alt=""></span>
+      <div class="utext"><b class="uline"><span class="ukick">${esc(c.name)} done:</span> <span class="uname">${esc(r.name)} unlocked</span></b>
+        <small>${r.kind}${effect ? ` · ${esc(effect)}` : ''}</small></div>
+    </div>`;
+}
+
+/** A Danger level this run opened: "Hard is now open". */
+function dangerCard(d, i) {
+  const D = DANGER[d];
+  return `<div class="ucard dang d${D.id}" style="--i:${i}" role="status"${tip('danger')} data-tip-text="${esc(`${D.name} can be picked in the lobby now. The whole team can use it as soon as one of you has unlocked it.`)}">
+      <span class="dbadge">${D.id}</span>
+      <div class="utext"><b class="uline"><span class="ukick">New Danger level:</span> <span class="uname">${esc(D.name)} is now open</span></b>
+        <small>${esc(D.desc)}</small></div>
+    </div>`;
+}
+
+/**
+ * The "Unlocked!" panel: everything the run that just ended unlocked in this browser (lastUnlocks()). Empty text when nothing was.
+ * Each card pops in one after the other.
+ */
+export function unlockedBox(u = lastUnlocks()) {
+  const heroes = u.heroes.filter((id) => CHARACTERS[id]);
+  const chals = u.challenges.map((id) => CHALLENGES.find((c) => c.id === id)).filter(Boolean);
+  const dangers = u.dangers.filter((d) => DANGER[d]);
+  if (!heroes.length && !chals.length && !dangers.length) return '';
+  const cards = unlockPanels(heroes, 0)
+    + chals.map((c, i) => challengeCard(c, heroes.length + i)).join('')
+    + dangers.map((d, i) => dangerCard(d, heroes.length + chals.length + i)).join('');
+  return `<section class="ubox" role="status"><h2 class="uhead">Unlocked!</h2><div class="ulist">${cards}</div></section>`;
 }
 
 export function endScreen(ui) {
@@ -130,7 +169,8 @@ export function endScreen(ui) {
       <p class="tag">${res.win ? `The herd survived all ${total} waves.` : `The herd fell on wave ${n(res.wave)}.`}</p>
       <span class="wavepill">Wave ${n(res.wave)} / ${total}</span>${res.danger !== undefined ? `<span class="wavepill">${esc(DANGER[res.danger]?.name || '')}</span>` : ''}
     </div>
-    ${unlockPanels()}
+    ${unlockedBox()}
+    ${nextGoalsHtml()}
     <div class="escroll">
       <table class="score">
         <thead><tr><th data-tip-text="Each player, their hero and the titles they earned.&#10;A star marks the best number in a column."></th>${COLUMNS.map(([, label, hint]) => `<th data-tip-text="${esc(hint)}">${label}</th>`).join('')}</tr></thead>

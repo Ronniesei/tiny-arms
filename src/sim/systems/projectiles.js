@@ -6,6 +6,8 @@
 //   noHit               fly without touching anything (lobbed shells)
 //   boom                {r, dmg, crit, kb, fireDps?, fireDur?, fireR?} explosion data for lobbed / bouncing bombs
 //   wuid                uid of the weapon that fired it; hits, explosions, burns and fire are credited to that weapon
+//   Boomerang Bone (kind p_boomerang) uses its own fields: dx/dy (real velocity), leg (0 out, 1 back), dist/maxD, speed, spin,
+//                       critChance/critMult (crit is rolled for every hit). Its vx/vy are only the heading sent to clients (spins).
 //   bnc                 bounces left (Bouncy Pebbles, set in entities.js spawnProjectile): after its last hit it turns toward a
 //                       nearby enemy it has not hit, at 70% damage
 
@@ -13,7 +15,7 @@ import { BALANCE } from '../../data/balance.js';
 import { ENEMIES } from '../../data/enemies.js';
 import { SPECIAL_RULES } from '../../data/items.js';
 import { emit, spawnHazard } from '../entities.js';
-import { hitEnemy } from './damage.js';
+import { hitEnemy, rollCrit } from './damage.js';
 import { applyBurn } from './status.js';
 
 /**
@@ -91,6 +93,14 @@ function bounceOff(w, pr, from) {
   return true;
 }
 
+/** Boomerang Bone turns around: the way back may hit every enemy again. */
+function turnBack(pr) {
+  pr.leg = 1;
+  pr.hitIds.length = 0;
+}
+
+const BOOMERANG = { returnMult: 1.2, spin: 14 }; // the way back is 20% faster; spin in rad/s (shown to clients through vx/vy)
+
 /** kind -> { update?(w, proj, dt), onHit?(w, proj, enemy) => boolean (true = handled), onExpire?(w, proj) } */
 export const PROJECTILE_KINDS = {
   // Lava Lobber shell: flies to a fixed point, ignoring enemies on the way, then explodes and leaves fire.
@@ -122,6 +132,45 @@ export const PROJECTILE_KINDS = {
       return true;
     },
     onExpire(w, pr) { detonate(w, pr); },
+  },
+
+  // Boomerang Bone: straight out to maxD px (or the arena wall), then back: it homes on the owner's current position and ends
+  // when it reaches them. Every enemy is hit once per leg (the generic loop has already put it in hitIds; turnBack clears them).
+  p_boomerang: {
+    update(w, pr, dt) {
+      const { w: AW, h: AH } = BALANCE.arena;
+      const owner = w.players[pr.pid];
+      if (pr.leg === 0) {
+        pr.x += pr.dx * dt;
+        pr.y += pr.dy * dt;
+        pr.dist += pr.speed * dt;
+        const m = pr.r;
+        if (pr.x < m || pr.x > AW - m || pr.y < m || pr.y > AH - m) {
+          pr.x = Math.min(AW - m, Math.max(m, pr.x));
+          pr.y = Math.min(AH - m, Math.max(m, pr.y));
+          turnBack(pr);
+        } else if (pr.dist >= pr.maxD) turnBack(pr);
+      } else {
+        if (!owner || owner.gone || owner.downed) { pr.life = 0; return; }
+        const dx = owner.x - pr.x, dy = owner.y - pr.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const step = pr.speed * BOOMERANG.returnMult * dt;
+        if (d <= step + owner.r) { pr.life = 0; return; } // caught
+        pr.dx = (dx / d) * pr.speed * BOOMERANG.returnMult;
+        pr.dy = (dy / d) * pr.speed * BOOMERANG.returnMult;
+        pr.x += pr.dx * dt;
+        pr.y += pr.dy * dt;
+      }
+      pr.spin += BOOMERANG.spin * dt;
+      pr.vx = Math.cos(pr.spin);
+      pr.vy = Math.sin(pr.spin);
+    },
+    onHit(w, pr, e) {
+      const owner = w.players[pr.pid];
+      const [d, crit] = owner ? rollCrit(w, owner, pr.dmg, pr.critChance, pr.critMult) : [pr.dmg, false]; // a fresh crit roll per hit
+      hitEnemy(w, e, d, { pid: pr.pid, crit, kb: pr.kb, kbAngle: Math.atan2(pr.dy, pr.dx), source: 'p', wuid: pr.wuid });
+      return true;
+    },
   },
 };
 

@@ -6,16 +6,24 @@
 //   dmg         enemy damage multiplier (contact damage; see dangerOf(w).dmg for the other attack types)
 //   extraElites wave numbers that get an elite ON TOP of the wave table's own elite waves (WAVES[n].elite)
 //   bossHp      extra multiplier for the boss only (on top of hp)
+//   speed       enemy move speed multiplier (optional, default 1)
+//   meteors     {every, dmg, perWave, r} or null: during waves a meteor lands near a random player every `every` s
+//               (red circle warning first). dmg = base damage at wave 1, +perWave each wave. r = blast radius.
+//               Implemented in src/sim/systems/hazards.js.
+//
+// Unlocking: Chill and Normal are open. Winning on level d unlocks d+1 (src/meta/unlocks.js maxDangerUnlocked).
 //
 // Everything here is plain data: weekly tweaks are number edits.
 
 import { WAVES } from './waves.js';
 
 export const DANGER = [
-  { id: 0, name: 'Chill', desc: 'Relaxed. Softer enemies, good for learning.', hp: 0.75, dmg: 0.75, extraElites: [], bossHp: 1 },
-  { id: 1, name: 'Normal', desc: 'The standard run. Start here.', hp: 1, dmg: 1, extraElites: [], bossHp: 1 },
-  { id: 2, name: 'Hard', desc: 'Tougher enemies and another elite late on.', hp: 1.25, dmg: 1.2, extraElites: [17], bossHp: 1 },
-  { id: 3, name: 'Extinction', desc: 'Brutal. Elites late on and a much tougher boss.', hp: 1.5, dmg: 1.4, extraElites: [17], bossHp: 1.3 },
+  { id: 0, name: 'Chill', desc: 'Relaxed. Softer enemies, good for learning.', hp: 0.75, dmg: 0.75, extraElites: [], bossHp: 1, speed: 1, meteors: null },
+  { id: 1, name: 'Normal', desc: 'The standard run. Start here.', hp: 1, dmg: 1, extraElites: [], bossHp: 1, speed: 1, meteors: null },
+  { id: 2, name: 'Hard', desc: 'Tougher enemies and another elite late on.', hp: 1.25, dmg: 1.2, extraElites: [17], bossHp: 1, speed: 1, meteors: null },
+  { id: 3, name: 'Extinction', desc: 'Brutal. Elites late on and a much tougher boss.', hp: 1.5, dmg: 1.4, extraElites: [17], bossHp: 1.3, speed: 1, meteors: null },
+  { id: 4, name: 'Meteor Shower', desc: 'Meteors rain on the arena. Faster enemies, more elites.', hp: 1.75, dmg: 1.55, extraElites: [12, 17], bossHp: 1.5, speed: 1.06, meteors: { every: 5, dmg: 8, perWave: 1.2, r: 90 } },
+  { id: 5, name: 'Apocalypse', desc: 'The sky is falling. Everything is faster, tougher and angrier.', hp: 2.05, dmg: 1.75, extraElites: [8, 12, 17], bossHp: 1.8, speed: 1.12, meteors: { every: 3, dmg: 10, perWave: 1.5, r: 100 } },
 ];
 
 export const DEFAULT_DANGER = 1;

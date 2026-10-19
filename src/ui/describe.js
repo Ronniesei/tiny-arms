@@ -63,7 +63,10 @@ export function weaponStats(wid, tier, stats = null) {
   const base = d.dmg[i];
   const dmg = stats ? weaponDamage(d, t, stats) : base;
   const cooldown = stats ? weaponCooldown(d, t, stats) : d.cooldown[i];
-  const count = d.behaviour === 'turret' ? (tierVal(d.count, t) || 1) + (stats?.extraSummons || 0) : 1; // Bolt's Workshop: +1
+  // Turrets and swarms (Beetle Jar: a drone with a count) deal their damage once per summon; Bolt's Workshop: +1 each.
+  // A Boomerang Bone hits an enemy next to you twice (out and back), so its DPS counts two hits.
+  const swarm = d.behaviour === 'turret' || (d.behaviour === 'drone' && d.count);
+  const count = swarm ? (tierVal(d.count, t) || 1) + (stats?.extraSummons || 0) : d.behaviour === 'boomerang' ? 2 : 1;
   const dps = cooldown > 0 ? (dmg / cooldown) * count : 0;
   const range = stats ? weaponRange(d, stats) : d.range;
   return { base, dmg, cooldown, dps, range, count };
@@ -112,6 +115,8 @@ export function weaponLines(wid, tier, stats = null) {
     if (bd > 0) add('Burn', `${fmt(bd * ap)}/s for ${fmt(d.burn.time || 0)}s`);
   }
   if (d.behaviour === 'turret') add('Turrets', `${s.count}`);
+  else if (d.behaviour === 'drone' && d.count) add('Beetles', `${s.count}`);
+  if (d.behaviour === 'boomerang') add('Hits', 'out and back', 'twice per enemy');
   if (d.knockback >= 100) add('Knockback', fmt(d.knockback));
 
   if (d.desc) lines.push({ text: d.desc, note: true });

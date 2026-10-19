@@ -12,9 +12,11 @@
 //   shoot {pid, slot, a, wid}                    projectile / lob / bounce shot, drone dive, turret shot
 //   beam  {pid, slot, a, x, y, x2, y2, wid}      instant line from (x, y) to (x2, y2)
 //   explode {x, y, r, pid}                       area blast (Lava Lobber, Coconut Bomb, Dino Dynamite, Boom Boots)
+//   (Boomerang Bone sends `shoot` like any projectile weapon; its p_boomerang kind lives in projectiles.js)
 //
 // Item hooks (src/sim/hooks.js): melee hits pass `melee: true` and a `swing` id so Serrated Tooth and Shockwave Club can react;
 // Twin Quiver adds extra projectiles here (fan()); Egg Clutch adds summons in MAINTAIN; update() runs hooks.update (fuses, bleeds).
+// Adrenaline Gland's attack speed is applied by cooldownOf() (every weapon and summon cooldown goes through it).
 
 import { BALANCE } from '../../data/balance.js';
 import { WEAPONS } from '../../data/weapons.js';
@@ -93,6 +95,16 @@ export function pickRangedTarget(w, p, x, y, reach) {
 
 function tierVal(v, tier) {
   return Array.isArray(v) ? v[tier - 1] : v;
+}
+
+/** Cooldown of one of the player's weapons or summons: weaponCooldown, plus Adrenaline Gland's attack speed while its timer runs. */
+export function cooldownOf(p, def, tier) {
+  if (!(p.adrenT > 0)) return weaponCooldown(def, tier, p.stats);
+  const bonus = SPECIAL_RULES.adrenaline.attackSpeed;
+  p.stats.attackSpeed += bonus; // borrowed for this one call
+  const cd = weaponCooldown(def, tier, p.stats);
+  p.stats.attackSpeed -= bonus;
+  return cd;
 }
 
 /**
@@ -228,6 +240,25 @@ export const BEHAVIOURS = {
     emit(w, { type: 'shoot', pid: p.id, slot, a: +ang.toFixed(2), wid: def.id });
   },
 
+  // Boomerang Bone: flies straight out to the weapon's range, turns and flies back to the player, hitting every enemy it passes
+  // on the way out and again on the way back (projectiles.js, kind p_boomerang). Twin Quiver throws extra ones in a fan.
+  boomerang(w, p, wpn, def, target, pos, slot) {
+    const ang = Math.atan2(target.y - pos.y, target.x - pos.x);
+    const base = weaponDamage(def, wpn.tier, p.stats);
+    const reach = weaponRange(def, p.stats);
+    for (const off of fan(p.specials?.extraShots)) {
+      const a = ang + off;
+      spawnProjectile(w, {
+        kind: def.projectile, pid: p.id, wid: def.id, wuid: wpn.uid, x: pos.x, y: pos.y,
+        vx: Math.cos(a), vy: Math.sin(a), // the sent heading: projectiles.js spins it so the boomerang turns in flight
+        dx: Math.cos(a) * def.speed, dy: Math.sin(a) * def.speed, spin: a, speed: def.speed,
+        dmg: base, critChance: def.critChance, critMult: def.critMult, kb: def.knockback || 0,
+        leg: 0, dist: 0, maxD: reach, life: (reach / def.speed) * 2 + 3, r: def.projRadius || 14, pierce: 0,
+      });
+    }
+    emit(w, { type: 'shoot', pid: p.id, slot, a: +ang.toFixed(2), wid: def.id });
+  },
+
   // Amber Laser: an instant line from the weapon through every enemy in range.
   beam(w, p, wpn, def, target, pos, slot) {
     const ang = Math.atan2(target.y - pos.y, target.x - pos.x);
@@ -258,11 +289,12 @@ function ownedSummons(w, pid, wuid, kind) {
 /** Per-frame upkeep for summon weapons: (w, player, weapon, def, slotIndex) => void. Needs no target. */
 export const MAINTAIN = {
   drone(w, p, wpn, def, slot) {
-    const want = 1 + (p.specials?.clutch || 0) + (p.stats.extraSummons || 0); // Egg Clutch: +1 pterodactyl per copy; Bolt's Workshop: +1
-    const have = ownedSummons(w, p.id, wpn.uid, 'ptero');
+    const kind = def.summon || 'ptero'; // Beetle Jar: s_beetle (same behaviour, its own sprite)
+    const want = (tierVal(def.count, wpn.tier) || 1) + (p.specials?.clutch || 0) + (p.stats.extraSummons || 0); // Egg Clutch: +1 per copy; Bolt's Workshop: +1
+    const have = ownedSummons(w, p.id, wpn.uid, kind);
     if (have >= want) return;
     spawnSummon(w, {
-      kind: 'ptero', pid: p.id, wuid: wpn.uid, wid: def.id, x: p.x, y: p.y - 40, a: 0, r: 12,
+      kind, pid: p.id, wuid: wpn.uid, wid: def.id, x: p.x, y: p.y - 40, a: 0, r: kind === 'ptero' ? 12 : 10,
       st: 'orbit', ang: range(w.rng, 0, Math.PI * 2), cd: 0.4 + 0.35 * have, hitIds: [],
     });
   },
@@ -301,7 +333,7 @@ export function update(w, dt) {
       const behaviour = BEHAVIOURS[def.behaviour];
       if (!behaviour) continue;
       behaviour(w, p, wpn, def, target, slotPos(p, i, n), i);
-      wpn.cd = weaponCooldown(def, wpn.tier, p.stats);
+      wpn.cd = cooldownOf(p, def, wpn.tier);
     }
   }
 }

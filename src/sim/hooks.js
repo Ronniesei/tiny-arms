@@ -3,9 +3,12 @@
 //   onHit(w, e, p, dmg, o)    after the player p's hit landed on enemy e (damage.js hitEnemy). o = the hit's options.
 //                               crit hits: Bloodthirst heals, Chain Spark zaps. melee hits (o.melee): Serrated Tooth bleeds,
 //                               Shockwave Club shoves the enemies behind.
-//   onKill(w, e, p, hit)      the player p killed e with `hit` = {dmg, wuid}: Mana Leech, Dino Dynamite.
-//   onRoll(w, p)              the player started a dodge roll: Boom Boots drops a bomb.
-//   update(w, dt)             every wave tick (weapons.update calls it): fuses (bombs, echoes, whirl pulses) and bleeds.
+//   onKill(w, e, p, hit)      the player p killed e with `hit` = {dmg, wuid}: Mana Leech, Dino Dynamite, Ember Heart (enemies that die
+//                               burning burst; credited to the killer, or to whoever lit it).
+//   onRoll(w, p)              the player started a dodge roll: Boom Boots drops a bomb, Rolling Stone readies its bowling,
+//                               Adrenaline Gland starts its timer (p.adrenT, read by damage.js and weapons.js).
+//   update(w, dt)             every wave tick (weapons.update calls it): fuses (bombs, echoes, whirl pulses), bleeds, the roll's
+//                               bowling and the Adrenaline timer.
 //   endWaveCleanup(w)         the wave ended: drop fuses that never fired.
 //
 // Rules for effects that hurt enemies: they go through hitEnemy with `pid` (and `wuid` when it is a weapon's damage), so
@@ -18,9 +21,10 @@
 //
 // Events used (all already drawn by render/fx.js): explode, hit, heal, beam (the Chain Spark line), cast (Spell Echo).
 
+import { BALANCE } from '../data/balance.js';
 import { ENEMIES } from '../data/enemies.js';
 import { SPECIAL_RULES } from '../data/items.js';
-import { emit, spawnHazard } from './entities.js';
+import { emit, spawnHazard, spawnPickup } from './entities.js';
 import { chance } from './rng.js';
 import { hitEnemy, healPlayer } from './systems/damage.js';
 import { applyBurn } from './systems/status.js';
@@ -174,6 +178,7 @@ export function onHit(w, e, p, dmg, o) {
     applyBurn(e, dmg * p.stats.kindleDps, p.stats.kindleTime, p.id, o.wuid);
   }
   if (o.crit) {
+    if (p.stats.critAmber > 0 && chance(w.rng, p.stats.critAmber)) spawnPickup(w, 'amber', e.x, e.y, 1); // Lucky, Jackpot Gem
     if (sp.critHeal > 0) critHeal(w, p, sp);
     if (sp.chainZap > 0 && depth < 2) { depth++; chainZap(w, e, p, dmg, o, sp.chainZap); depth--; }
   }
@@ -195,13 +200,31 @@ export function onKill(w, e, p, hit) {
     explode(w, e.x, e.y, R.radius, hit.dmg * R.dmgFrac, { pid: p.id, source: 'p', wuid: hit.wuid });
     depth--;
   }
+  emberBurst(w, e, p);
+}
+
+/** Ember Heart: an enemy that dies burning explodes. The killer's item counts first, else the player who lit the fire. */
+function emberBurst(w, e, killer) {
+  if (!(e.burn > 0 || e.burnDps > 0)) return; // a burn's last tick has already counted the time down, so burnDps tells too
+  const R = SPECIAL_RULES.emberBurst;
+  if (depth >= R.maxDepth) return;
+  let owner = killer;
+  if (!(owner?.specials?.emberBurst > 0)) owner = e.burnPid >= 0 ? w.players[e.burnPid] : null;
+  const k = owner?.specials?.emberBurst || 0;
+  if (!(k > 0) || owner.gone) return;
+  depth++;
+  explode(w, e.x, e.y, R.radius, blastDamage(w, owner, R.dmg, R.perWave) * k, { pid: owner.id, source: 'p' });
+  depth--;
 }
 
 // ---- on roll ----
 
 export function onRoll(w, p) {
   const sp = p.specials;
-  if (!(sp?.rollBomb > 0)) return;
+  if (!sp) return;
+  if (sp.rollBowl > 0) p.rollHit = []; // Rolling Stone: nobody has been bowled over yet this roll
+  if (sp.adrenaline > 0) p.adrenT = BALANCE.roll.duration + SPECIAL_RULES.adrenaline.time; // Adrenaline Gland: counts down after the roll
+  if (!(sp.rollBomb > 0)) return;
   const R = SPECIAL_RULES.rollBomb;
   const r = R.radius * (1 + (sp.blastSize || 0));
   addFuse(w, { kind: 'bomb', t: R.fuse, x: p.x, y: p.y, pid: p.id, r: R.radius, dmg: blastDamage(w, p, R.dmg, R.perWave) });
@@ -211,13 +234,38 @@ export function onRoll(w, p) {
 
 // ---- per tick and wave end ----
 
+/** Rolling Stone: while p rolls, every enemy the T-Rex overlaps is bowled over once per roll. */
+function bowl(w, p) {
+  const R = SPECIAL_RULES.rollBowl;
+  const hit = p.rollHit || (p.rollHit = []);
+  let dmg = 0;
+  for (const e of w.grid.query(p.x, p.y, p.r + 4)) {
+    if (!alive(e) || hit.includes(e.id)) continue;
+    hit.push(e.id);
+    if (!dmg) {
+      dmg = (R.dmg + R.melee * Math.max(0, p.stats.meleeDamage)) * (1 + R.perWave * Math.max(0, w.wave - 1)) *
+        Math.max(0.2, 1 + (p.stats.damage || 0) / 100) * p.specials.rollBowl;
+    }
+    hitEnemy(w, e, dmg, { pid: p.id, kb: R.kb, kbAngle: Math.atan2(p.rollDy, p.rollDx), source: 'p', secondary: true });
+  }
+}
+
+function updatePlayers(w, dt) {
+  for (const p of w.players) {
+    if (p.gone) continue;
+    if (p.adrenT > 0) p.adrenT = Math.max(0, p.adrenT - dt); // Adrenaline Gland
+    if (p.rollT > 0 && !p.downed && p.specials?.rollBowl > 0) bowl(w, p);
+  }
+}
+
 export function update(w, dt) {
   updateFuses(w, dt);
   updateBleeds(w, dt);
+  updatePlayers(w, dt);
 }
 
 /** The wave is over: bombs and echoes that never fired are dropped (enemies and hazards are cleared too). */
 export function endWaveCleanup(w) {
   if (w.fuses) w.fuses.length = 0;
-  for (const p of w.players) p.critHealAcc = 0;
+  for (const p of w.players) { p.critHealAcc = 0; p.adrenT = 0; }
 }

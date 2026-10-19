@@ -52,6 +52,7 @@ export function createPlayer(w, { id, name, char }) {
     score: {
       kills: 0, damageDealt: 0, damageTaken: 0, revives: 0, healing: 0,
       amber: 0, casts: 0, downs: 0, firstFallTick: -1, byWeapon: {},
+      rolls: 0, cleanWaves: 0, hurtThisWave: false, // for challenges (docs/PROGRESSION.md)
     },
   };
 }
@@ -81,7 +82,7 @@ export function spawnEnemy(w, type, x, y, extra = {}) {
   }
   const e = {
     id: newId(w), type, x, y, r: def.radius,
-    hp: sc.hp, maxHp: sc.hp, dmg: sc.dmg, speed: def.speed,
+    hp: sc.hp, maxHp: sc.hp, dmg: sc.dmg, speed: def.neutral ? def.speed : def.speed * (dangerOf(w).speed || 1),
     vx: 0, vy: 0, kbx: 0, kby: 0, facing: 1,
     flash: 0, stun: 0, slow: 0, burn: 0, burnDps: 0, burnPid: -1,
     tele: null, st: 'move', t: 0, cd: 0, target: -1,

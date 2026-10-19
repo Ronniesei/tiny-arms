@@ -46,6 +46,15 @@ function bestOf(players, valueOf, mode = 'max') {
   return winners;
 }
 
+/** Final stats for challenges (docs/PROGRESSION.md "Run summary"), rounded to 0.1. */
+const SNAP_KEYS = ['maxHp', 'armor', 'dodge', 'speed', 'luck', 'harvesting', 'critChance', 'attackSpeed', 'damage', 'hpRegen',
+  'lifeSteal', 'range', 'abilityPower', 'rangedDamage', 'meleeDamage', 'maxMana'];
+function statSnapshot(s) {
+  const out = {};
+  for (const k of SNAP_KEYS) out[k] = Math.round(num(s?.[k]) * 10) / 10;
+  return out;
+}
+
 /** Final weapons, items and per-weapon damage of one player (see the header comment). */
 function buildOf(p) {
   const owned = p.weapons || [];
@@ -63,7 +72,7 @@ function buildOf(p) {
     byWeapon.push({ wid: r.wid, tier: r.tier, dmg: Math.round(r.dmg), uid: +k, gone: true });
   }
   byWeapon.sort((a, b) => b.dmg - a.dmg || a.gone - b.gone || a.uid - b.uid);
-  return { weapons, items: (p.items || []).slice(), byWeapon };
+  return { weapons, items: (p.items || []).slice(), byWeapon, level: p.level || 0, stats: statSnapshot(p.stats) };
 }
 
 /** @returns {{rows: object[], titles: {id, name, desc, cap, pid}[]}} */

@@ -34,6 +34,12 @@ function creditWeapon(p, uid, dealt) {
   rec.wave = (rec.wave || 0) + dealt; // this wave only; world.endWave moves it to rec.last
 }
 
+/** Mates that count for the herd bonus: the live mates nearby, plus Herd Horn's extra one (it works solo too). */
+export function herdOf(p) {
+  if (p.downed || p.gone) return 0;
+  return (p.herd || 0) + (p.specials?.herdHorn || 0);
+}
+
 /**
  * Damage an enemy.
  * @param {object} w world
@@ -51,7 +57,11 @@ export function hitEnemy(w, e, amount, o = {}) {
   // Boss phase-change roar: immune (no damage, no numbers). enemies.js sets invHp and st 'roar'.
   if (e.invHp > 0 && e.st === 'roar') return 0;
   const by = o.pid !== undefined && o.pid >= 0 ? w.players[o.pid] : null;
-  if (by?.herd) amount *= 1 + BALANCE.coop.herdDamage * by.herd; // herd spirit
+  if (by) {
+    const herd = herdOf(by);
+    if (herd) amount *= 1 + BALANCE.coop.herdDamage * herd; // herd spirit (Herd Horn adds a mate)
+    if (by.adrenT > 0 && o.source !== 'burn' && !o.secondary) amount *= 1 + SPECIAL_RULES.adrenaline.damage; // Adrenaline Gland
+  }
   if (o.source === 'burn' && !o.secondary && by && by.stats.burnMult > 1) amount *= by.stats.burnMult; // Ash's Kindling: burns hit harder
   const dmg = Math.max(1, Math.round(amount));
   const dealt = Math.min(dmg, e.hp);
@@ -157,16 +167,49 @@ export function hitPlayer(w, p, amount, o = {}) {
     emit(w, { type: 'dodge', pid: p.id, x: Math.round(p.x), y: Math.round(p.y - p.r) });
     return 0;
   }
-  const st = p.herd ? { ...p.stats, armor: p.stats.armor + p.herd * BALANCE.coop.herdArmor } : p.stats; // herd spirit
+  // Fossil Shield: blocks one whole hit, then recharges (it is ready again at the start of every wave). Drawn as a dodge.
+  const fs = p.specials?.fossilShield || 0;
+  if (fs > 0 && (p.shieldWave !== w.wave || w.waveTime >= p.shieldAt)) {
+    const R = SPECIAL_RULES.fossilShield;
+    p.shieldWave = w.wave;
+    p.shieldAt = w.waveTime + R.cooldown / fs;
+    p.iframes = Math.max(p.iframes, R.iframes);
+    emit(w, { type: 'dodge', pid: p.id, x: Math.round(p.x), y: Math.round(p.y - p.r) });
+    return 0;
+  }
+  const herd = herdOf(p);
+  const st = herd ? { ...p.stats, armor: p.stats.armor + herd * BALANCE.coop.herdArmor } : p.stats; // herd spirit
   const dmg = Math.max(1, Math.round(amount * armorFactor(st)));
   p.hp -= dmg;
   p.flash = 0.1;
   const frac = Math.min(1, dmg / p.stats.maxHp / BALANCE.player.iframesHitPct);
   p.iframes = BALANCE.player.iframesMin + (BALANCE.player.iframesMax - BALANCE.player.iframesMin) * frac;
   p.score.damageTaken += dmg;
+  if (dmg > 0) p.score.hurtThisWave = true;
   emit(w, { type: 'phit', pid: p.id, x: Math.round(p.x), y: Math.round(p.y - p.r), a: dmg });
+  // Second Wind: once per wave a lethal hit leaves 1 HP and a second of invulnerability. Drawn as a +1 heal.
+  if (p.hp <= 0 && p.specials?.secondWind > 0 && p.windWave !== w.wave) {
+    p.windWave = w.wave;
+    p.hp = 1;
+    p.iframes = Math.max(p.iframes, SPECIAL_RULES.secondWind.iframes);
+    emit(w, { type: 'heal', pid: p.id, x: Math.round(p.x), y: Math.round(p.y - p.r), a: 1 });
+  }
   if (p.hp <= 0) downPlayer(w, p);
+  else if (p.specials?.thorns > 0 && ENEMIES[o.source]) thorns(w, p, amount, o.source); // Quill Coat
   return dmg;
+}
+
+/** Quill Coat: the enemy that just hit p in contact takes (hit before armor x thorns) back, once per hit. */
+function thorns(w, p, amount, type) {
+  const R = SPECIAL_RULES.thorns;
+  // The same query enemies.js uses to find who is touching the player; the first one of this type is the attacker.
+  for (const e of w.grid.query(p.x, p.y, p.r * 0.85)) {
+    if (e.dead || e.type !== type || e.dmg <= 0 || e.stun > 0 || e.noContact) continue;
+    hitEnemy(w, e, Math.max(R.min, amount * p.specials.thorns), {
+      pid: p.id, kb: R.kb, kbAngle: Math.atan2(e.y - p.y, e.x - p.x), source: 'p', secondary: true,
+    });
+    return;
+  }
 }
 
 export function downPlayer(w, p) {

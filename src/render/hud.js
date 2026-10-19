@@ -598,6 +598,19 @@ function abilityIcon(g, id, x, y, color, alpha) {
     g.fillStyle(DARKER, alpha).fillCircle(x + 8, y + 8, 22);
     g.fillStyle(color, alpha).fillCircle(x + 8, y + 8, 17);
     g.fillStyle(0xffffff, alpha * 0.6).fillCircle(x + 2, y + 2, 5);
+  } else if (id === 'stampede') {
+    // Speed lines and a double chevron: charge!
+    both((c, w) => {
+      g.lineStyle(w, c, alpha);
+      for (const [dx, dy, len] of [[-36, -14, 16], [-40, 0, 20], [-36, 14, 16]]) g.lineBetween(x + dx, y + dy, x + dx + len, y + dy);
+      for (const ox of [-8, 12]) { g.beginPath(); g.moveTo(x + ox, y - 20); g.lineTo(x + ox + 16, y); g.lineTo(x + ox, y + 20); g.strokePath(); }
+    });
+  } else if (id === 'jackpot') {
+    // A die showing five.
+    g.fillStyle(DARKER, alpha).fillRoundedRect(x - 28, y - 28, 56, 56, 12);
+    g.fillStyle(0xfff4dc, alpha).fillRoundedRect(x - 23, y - 23, 46, 46, 9);
+    g.fillStyle(color, alpha);
+    for (const [dx, dy] of [[-11, -11], [11, -11], [0, 0], [-11, 11], [11, 11]]) g.fillCircle(x + dx, y + dy, 5);
   } else {
     const pts = [];
     for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 13 : 30; pts.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r }); }

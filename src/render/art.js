@@ -8,6 +8,7 @@ export const SPRITES = {
   // Heroes (viewBox 128)
   h_brutus: [72, 0x3f7d3a, 'rex'], h_fern: [64, 0x8fd16a, 'rex'], h_spike: [64, 0xf08a24, 'rex'], h_sparky: [64, 0x6b6fe0, 'rex'],
   h_pip: [64, 0xf06aa0, 'rex'], h_goldie: [64, 0xe8b830, 'rex'], h_bolt: [64, 0x2fb5a8, 'rex'], h_ash: [64, 0x5a4a52, 'rex'],
+  h_dash: [64, 0xe04a3a, 'rex'], h_lucky: [64, 0x3aa860, 'rex'],
   // Enemies (small viewBox 64, big 192, boss 256)
   e_raptor: [60, 0xa8432a, 'blob'], e_spitter: [64, 0x7c8a3a, 'blob'], e_caveman: [64, 0xc9a26b, 'blob'],
   e_mosquito: [34, 0x5a2a4a, 'blob'], e_ptero: [72, 0x7a6a8a, 'blob'], e_ankylo: [104, 0x8a8a84, 'blob'],
@@ -17,12 +18,13 @@ export const SPRITES = {
   w_slingshot: [32, 0x8a5a3a, 'stick'], w_spear_thrower: [38, 0x7a5a3a, 'stick'], w_bone_bow: [36, 0xeee2c8, 'stick'],
   w_lava_lobber: [36, 0x8a3a2a, 'stick'], w_ember_staff: [38, 0xd8662a, 'stick'], w_ptero_pal: [34, 0x7a6a8a, 'stick'],
   w_egg_turret: [34, 0xf0e8d0, 'stick'], w_coconut_bomb: [32, 0x7a5030, 'stick'], w_amber_laser: [34, 0xffb627, 'stick'],
+  w_raptor_claws: [34, 0xeee2c8, 'stick'], w_boomerang_bone: [36, 0xeee2c8, 'stick'], w_beetle_jar: [34, 0x6fa8a0, 'stick'],
   // Projectiles (viewBox 32)
   p_pebble: [14, 0xd8d0c0, 'dot'], p_spear: [34, 0xc0a070, 'dart'], p_arrow: [30, 0xeee2c8, 'dart'],
   p_lava: [22, 0xff6a2a, 'dot'], p_ember: [18, 0xffa040, 'dot'], p_coconut: [22, 0x7a5030, 'dot'],
-  p_spike: [22, 0xb0a090, 'dart'], p_egg: [14, 0xfff4dc, 'dot'],
-  // Summons
-  s_turret: [44, 0xf0e8d0, 'blob'], s_ptero: [44, 0x9a8aaa, 'blob'],
+  p_spike: [22, 0xb0a090, 'dart'], p_egg: [14, 0xfff4dc, 'dot'], p_boomerang: [30, 0xeee2c8, 'dart'],
+  // Summons (the renderer picks the sprite by the summon's kind string)
+  s_turret: [44, 0xf0e8d0, 'blob'], s_ptero: [44, 0x9a8aaa, 'blob'], s_beetle: [34, 0x3a6f8a, 'blob'],
   // Pickups (viewBox 32; the loot crate is drawn at viewBox 64)
   amber: [22, 0xffb627, 'gem'], berry: [24, 0xd03a5a, 'dot'], crate: [42, 0xb98a4a, 'box'],
   // Arena props (viewBox 64)

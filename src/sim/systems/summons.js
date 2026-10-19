@@ -1,4 +1,4 @@
-// Player summons (turrets, drones). Register kinds in SUMMON_KINDS: { update(w, s, dt) }.
+// Player summons (turrets, drones). Register kinds in SUMMON_KINDS: { update(w, s, dt) }. Kinds: ptero, turret, s_beetle.
 // Summons are cleared at wave end; the weapons that create them re-create them (MAINTAIN in weapons.js).
 //
 // Every summon has {id, kind, pid, x, y, a (facing angle), r, wuid (uid of the owning weapon), wid}.
@@ -12,9 +12,9 @@ import { BALANCE } from '../../data/balance.js';
 import { WEAPONS } from '../../data/weapons.js';
 import { clampToArena, emit, nearestEnemy, spawnProjectile } from '../entities.js';
 import { range } from '../rng.js';
-import { weaponCooldown, weaponDamage, weaponRange } from '../stats.js';
+import { weaponDamage, weaponRange } from '../stats.js';
 import { hitEnemy, rollCrit } from './damage.js';
-import { PIERCE_FALLOFF, fan } from './weapons.js';
+import { PIERCE_FALLOFF, cooldownOf, fan } from './weapons.js';
 
 /** Bolt's Overclock: while it runs, the owner's summons count their cooldowns down this many times faster. */
 function summonRate(p) {
@@ -97,7 +97,7 @@ export const SUMMON_KINDS = {
         s.st = 'dive';
         s.hitIds = [];
         s.base = weaponDamage(def, wpn.tier, p.stats);
-        s.cd = weaponCooldown(def, wpn.tier, p.stats);
+        s.cd = cooldownOf(p, def, wpn.tier);
         s.a = Math.atan2(s.dy, s.dx);
         emit(w, { type: 'shoot', pid: p.id, slot: o.slot, a: +s.a.toFixed(2), wid: def.id });
       }
@@ -140,10 +140,14 @@ export const SUMMON_KINDS = {
         });
       }
       emit(w, { type: 'shoot', pid: p.id, slot: o.slot, a: +ang.toFixed(2), wid: def.id });
-      s.cd = weaponCooldown(def, wpn.tier, p.stats);
+      s.cd = cooldownOf(p, def, wpn.tier);
     },
   },
 };
+
+// Beetle Jar: the beetles are drones too (circle the owner, dive at enemies); they only differ in numbers (data/weapons.js)
+// and sprite (s_beetle). The renderer picks the sprite by the kind string.
+SUMMON_KINDS.s_beetle = SUMMON_KINDS.ptero;
 
 export function update(w, dt) {
   for (const s of w.summons) {

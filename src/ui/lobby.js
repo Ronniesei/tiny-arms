@@ -1,6 +1,6 @@
-// Lobby: room code and invite link, the four player slots, the danger picker, the hero grid (8 tiles in two rows of 4:
-// locked heroes are silhouettes with their unlock condition and progress) and a detail card for the hero you are looking at,
-// ready / start.
+// Lobby: room code and invite link, the four player slots, the danger picker (six levels; the ones nobody in the lobby has
+// unlocked yet are greyed with a lock), the hero grid (10 tiles in two rows of 5: locked heroes are silhouettes with their
+// unlock condition and progress) and a detail card for the hero you are looking at, ready / start.
 
 import { CHARACTERS, CHARACTER_IDS } from '../data/characters.js';
 import { DANGER, clampDanger } from '../data/danger.js';
@@ -11,9 +11,14 @@ import { loadProgress, isUnlocked, heroProgress, heroStars } from '../meta/unloc
 import { esc, statLine } from './describe.js';
 import { tip } from './tips.js';
 import { howToPlayModal, defaultName } from './menu.js';
+import { SPR, LOCK_ICO, starsHtml, progressText, dangerChips, dangerTip, dangerUnlockText } from './collection.js';
 
-const SPR = (key) => `assets/sprites/${key}.svg`;
+export { progressText }; // moved to collection.js (the Challenges screen uses it too); still importable from here
 const SLOTS = 4;
+
+/** Keys 1-9 pick the first nine heroes, 0 the tenth. */
+const keyLabel = (i) => (i === 9 ? '0' : String(i + 1));
+const keyHint = () => (CHARACTER_IDS.length > 9 ? 'keys 1-9 and 0' : `keys 1-${CHARACTER_IDS.length}`);
 
 export function lobbyScreen(ui) {
   watchKeys(ui);
@@ -56,7 +61,7 @@ export function lobbyScreen(ui) {
     <div class="lscroll">
       ${s.solo ? '' : `<div class="players">${Array.from({ length: SLOTS }, (_, id) => slot(id, L.players.find((p) => p.id === id), L)).join('')}</div>`}
       ${dangerPicker(L)}
-      <p class="pickhead">Pick your T-Rex <small>keys 1-${CHARACTER_IDS.length}${lockedLeft ? ' · click a locked hero to see how to unlock it' : ' · all heroes unlocked'}</small></p>
+      <p class="pickhead">Pick your T-Rex <small>${esc(keyHint())}${lockedLeft ? ' · click a locked hero to see how to unlock it' : ' · all heroes unlocked'}</small></p>
       <div class="chars">${CHARACTER_IDS.map((id, i) => heroTile(id, i, me.char === id, lookId === id, picksOf(id), progress)).join('')}</div>
       ${charCard(lookId, me.char === lookId, CHARACTER_IDS.indexOf(lookId), picksOf(lookId), { progress })}
     </div>
@@ -67,36 +72,36 @@ export function lobbyScreen(ui) {
   </div></div>${ui.helpOpen ? howToPlayModal() : ''}`;
 }
 
-const pctText = (m) => `${m >= 1 ? '+' : '-'}${Math.round(Math.abs(m - 1) * 100)}%`;
-
-/** Chips for a danger level, built from its numbers so a data edit shows up here. */
-function dangerChips(D) {
-  if (D.hp === 1 && D.dmg === 1 && D.bossHp === 1 && !D.extraElites.length) return 'Base game';
-  return `HP ${pctText(D.hp)} · DMG ${pctText(D.dmg)}`;
+/**
+ * The highest Danger the lobby may pick: anyone in it having unlocked a level opens it for the whole team (L.maxDanger from the
+ * session). A lobby object without one (older callers, tests) has every level open.
+ */
+export function lobbyMaxDanger(L) {
+  return L.maxDanger === undefined ? DANGER.length - 1 : clampDanger(L.maxDanger);
 }
 
-/** What a danger level changes, from its numbers (the hover text of its button). */
-function dangerTip(D) {
-  const parts = [D.hp === 1 ? 'Enemies have normal HP' : `Enemies have ${Math.round(D.hp * 100)}% HP`];
-  parts.push(D.dmg === 1 ? 'deal normal damage' : `deal ${Math.round(D.dmg * 100)}% damage`);
-  if (D.bossHp !== 1) parts.push(`and the boss has another ${pctText(D.bossHp)} HP`);
-  const base = `${D.name}: ${parts.join(', ')}.`;
-  return D.extraElites.length ? `${base} An extra elite joins wave ${D.extraElites.join(', ')}.` : base;
-}
-
-/** The 4-button danger selector: clickable for the host, read-only for mates. */
+/** The danger selector (six levels): clickable for the host, read-only for mates. Levels nobody has unlocked yet are locked. */
 function dangerPicker(L) {
-  const cur = clampDanger(L.danger);
+  const maxD = lobbyMaxDanger(L);
+  const cur = Math.min(clampDanger(L.danger), maxD); // a locked level is never shown as the chosen one
   const cards = DANGER.map((D) => {
+    const locked = D.id > maxD;
     const sel = D.id === cur;
-    const inner = `<span class="dtop"><b>${esc(D.name)}</b><em>${esc(dangerChips(D))}</em></span><span class="ddesc">${esc(D.desc)}</span>`;
+    const inner = `<span class="dtop"><b>${esc(D.name)}</b>${locked ? LOCK_ICO : `<em>${esc(dangerChips(D))}</em>`}</span><span class="ddesc">${esc(D.desc)}</span>`;
+    if (locked) {
+      // No data-act: a locked level cannot be clicked, by the host or anyone else.
+      const why = `${dangerUnlockText(D.id)}
+Anyone in the lobby can unlock it for the whole team.
+${dangerTip(D)}`;
+      return `<div class="dg d${D.id} locked" role="radio" aria-checked="false" aria-disabled="true"${tip('danger')} data-tip-text="${esc(why)}">${inner}</div>`;
+    }
     const hover = `${tip('danger')} data-tip-text="${esc(dangerTip(D))}"`;
     return L.isHost
       ? `<button class="dg d${D.id} ${sel ? 'sel' : ''}" data-act="danger" data-d="${D.id}" role="radio" aria-checked="${sel}"${hover}>${inner}</button>`
       : `<div class="dg d${D.id} ro ${sel ? 'sel' : ''}" role="radio" aria-checked="${sel}"${hover}>${inner}</div>`;
   }).join('');
   return `<div class="danger" role="radiogroup" aria-label="Danger level">
-    <p class="dlabel"${tip('danger')}>Danger <small>${L.isHost ? 'you choose for the whole team' : 'chosen by the host'}</small></p>
+    <p class="dlabel"${tip('danger')}>Danger <small>${L.isHost ? 'you choose for the whole team' : 'chosen by the host'}${maxD < DANGER.length - 1 ? ' · win a run to open the next level' : ''}</small></p>
     <div class="dgs">${cards}</div>
   </div>`;
 }
@@ -116,23 +121,6 @@ function slot(id, p, L) {
   </div>`;
 }
 
-const LOCK_ICO = '<svg class="lockico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1zm2 0h6V8a3 3 0 0 0-6 0v2z"/></svg>';
-
-/** Danger stars (best Danger won with the hero): one star per Danger level, filled up to the best win. */
-function starsHtml(n) {
-  const title = n > 0
-    ? `Best win: ${DANGER[Math.min(n, DANGER.length) - 1].name} (${n} of ${DANGER.length} stars)`
-    : 'Win a run with this hero to earn stars. The higher the Danger, the more stars.';
-  return `<span class="stars" data-tip-text="${esc(title)}" aria-label="${esc(title)}">${DANGER.map((D, i) => `<i class="${i < n ? 'on' : ''}">&#9733;</i>`).join('')}</span>`;
-}
-
-/** "best 7/10" for the wave rule, "1,240 / 1,500" for totals. */
-export function progressText(id, progress) {
-  const g = heroProgress(id, progress);
-  const f = (v) => v.toLocaleString('en');
-  return g.stat === 'bestWave' ? `best ${f(g.have)}/${f(g.target)}` : `${f(g.have)} / ${f(g.target)}`;
-}
-
 /** One hero in the grid: a compact tile. Locked heroes are a dark silhouette with a lock, the condition and a progress bar. */
 function heroTile(id, index, picked, looking, picks, progress) {
   const c = CHARACTERS[id];
@@ -141,7 +129,7 @@ function heroTile(id, index, picked, looking, picks, progress) {
     const g = heroProgress(id, progress);
     const why = `${c.name} is locked. To unlock: ${g.text}. Progress: ${progressText(id, progress)}.\nClick to read about ${c.name}.`;
     return `<button class="char tile locked ${looking ? 'look' : ''}" data-act="look" data-char="${id}" aria-label="${esc(`${c.name}: locked. ${g.text}`)}" data-tip-text="${esc(why)}" style="--hc:${c.color}">
-      <kbd class="num">${index + 1}</kbd>
+      <kbd class="num">${keyLabel(index)}</kbd>
       <span class="stage"><img class="sil" src="${SPR(`h_${id}`)}" alt="">${LOCK_ICO}</span>
       <span class="tinfo">
         <b class="nm">${esc(c.name)}</b><span class="role">${esc(c.role)}</span>
@@ -152,7 +140,7 @@ function heroTile(id, index, picked, looking, picks, progress) {
     </button>`;
   }
   return `<button class="char tile ${picked ? 'sel' : ''} ${looking && !picked ? 'look' : ''}" data-act="pick" data-char="${id}" aria-pressed="${picked}" style="--hc:${c.color}">
-    <kbd class="num">${index + 1}</kbd>
+    <kbd class="num">${keyLabel(index)}</kbd>
     <span class="chosen">${picked ? 'Your pick' : ''}</span>
     <span class="stage"><img src="${SPR(`h_${id}`)}" alt=""></span>
     <span class="tinfo">
@@ -198,7 +186,7 @@ export function charCard(id, selected, index = 0, picks = [], opts = {}) {
   </section>`;
 }
 
-/** Keyboard shortcuts while the lobby is open: 1-8 pick a T-Rex (a locked one just shows its card), Enter starts (host) or readies (mate). */
+/** Keyboard shortcuts while the lobby is open: 1-9 and 0 pick a T-Rex (a locked one just shows its card), Enter starts (host) or readies (mate). */
 function watchKeys(ui) {
   if (ui._lobbyKeys) return;
   ui._lobbyKeys = true;
@@ -209,8 +197,8 @@ function watchKeys(ui) {
     if (tag === 'BUTTON') return; // a focused button handles Enter itself
     const s = ui.app.session;
     if (!s) return;
-    if (/^[1-9]$/.test(e.key)) {
-      const id = CHARACTER_IDS[+e.key - 1];
+    if (/^[0-9]$/.test(e.key)) {
+      const id = CHARACTER_IDS[e.key === '0' ? 9 : +e.key - 1];
       if (id) ui.act('pick', { char: id });
     } else if (e.key === 'Enter' && !e.repeat) {
       const L = s.lobby();
@@ -234,11 +222,12 @@ export const lobbyActions = {
     s.pick(d.char);
   },
   look: (ui, d) => { if (CHARACTERS[d.char]) ui.lookChar = d.char; },
-  // Host only. The choice is remembered for next time (app.settings.danger).
+  // Host only. The choice is remembered for next time (app.settings.danger). A level nobody in the lobby has unlocked is refused.
   danger: (ui, d) => {
     const s = ui.app.session;
     if (!s || !s.isHost) return;
     const level = clampDanger(+d.d);
+    if (level > lobbyMaxDanger(s.lobby())) { ui.toast?.(dangerUnlockText(level)); return; }
     s.setDanger(level);
     ui.app.settings.danger = level;
     ui.app.saveSettings();

@@ -148,6 +148,11 @@ export function ownedTags(p) {
   return n;
 }
 
+// The run's pool (docs/PROGRESSION.md): locked content stays out of the shop and crates. w.pool is null for everything.
+// Weapons you already own can still be offered (a hero's starting weapon may be locked for everyone else).
+const weaponPool = (w) => w.pool?.weapons || WEAPON_IDS;
+const itemPool = (w) => w.pool?.items || ITEM_IDS;
+
 /**
  * One weapon offer. `offers` are the other current offers (avoids showing the same weapon twice).
  * `opts.classes` (a Set of weapon classes) limits the roll to weapons of those classes.
@@ -155,7 +160,8 @@ export function ownedTags(p) {
 export function rollWeaponOffer(w, p, offers = [], opts = {}) {
   const owned = p.weapons.map((x) => x.wid);
   const taken = new Set(offers.filter((o) => o && o.kind === 'weapon').map((o) => o.id));
-  const only = opts.classes ? WEAPON_IDS.filter((id) => opts.classes.has(WEAPONS[id].cls)) : null;
+  const all = weaponPool(w);
+  const only = opts.classes ? all.filter((id) => opts.classes.has(WEAPONS[id].cls)) : null;
   let wid = null;
   for (let tries = 0; tries < 6; tries++) {
     const r = next(w.rng);
@@ -163,8 +169,9 @@ export function rollWeaponOffer(w, p, offers = [], opts = {}) {
     else if (owned.length && r < SHOP_RULES.ownedWeaponChance) wid = pick(w.rng, owned);
     else if (owned.length && r < SHOP_RULES.ownedWeaponChance + SHOP_RULES.ownedClassChance) {
       const cls = WEAPONS[pick(w.rng, owned)].cls;
-      wid = pick(w.rng, WEAPON_IDS.filter((id) => WEAPONS[id].cls === cls));
-    } else wid = pick(w.rng, WEAPON_IDS);
+      const same = all.filter((id) => WEAPONS[id].cls === cls);
+      wid = pick(w.rng, same.length ? same : all);
+    } else wid = pick(w.rng, all);
     if (!taken.has(wid)) break;
   }
   const tier = Math.min(4, rollTier(w, w.wave, p.stats.luck));
@@ -209,7 +216,7 @@ export function rollItemOffer(w, p, offers = [], opts = {}) {
       for (let t = start; t >= 1; t--) order.push(t);
       if (pass.tag) for (let t = start + 1; t <= top; t++) order.push(t);
       for (const tier of order) {
-        const pool = ITEM_IDS.filter((id) => ITEMS[id].tier === tier && !atItemLimit(p, id, pend) && !(avoidTaken && taken.has(id))
+        const pool = itemPool(w).filter((id) => ITEMS[id].tier === tier && !atItemLimit(p, id, pend) && !(avoidTaken && taken.has(id))
           && (!pass.lean || raisesAny(id, lean)) && (!pass.tag || ITEMS[id].tags?.includes(pass.tag)));
         if (pool.length) {
           const id = pick(w.rng, pool);

@@ -12,8 +12,11 @@ const INPUT_HZ = 30;
 const SNAP_CORRECT = 0.15;    // fraction of prediction error removed per snapshot
 const HARD_SNAP_PX = 40;
 
+/** Dash's Stampede moves the hero on the host: follow the host instead of predicting a walk (abState = casting flag). */
+const charging = (me) => me.char === 'dash' && me.casting;
+
 export class ClientSession {
-  constructor({ code, name, char, local = false }) {
+  constructor({ code, name, char, local = false, unlocks = null }) {
     this.isHost = false;
     this.myId = -1;
     this.code = code;
@@ -24,6 +27,8 @@ export class ClientSession {
     this.error = null;
     this.players = [];
     this.danger = DEFAULT_DANGER;   // the host's choice, read-only here
+    this.maxDanger = DEFAULT_DANGER; // the highest level anyone in the lobby has unlocked (lobby message)
+    this.unlocks = unlocks;          // this browser's {items, weapons, maxDanger}: sent in hello (docs/PROGRESSION.md)
     this.ready = false;
     this.names = {};
     this.snaps = [];          // [{time, view}]
@@ -49,7 +54,7 @@ export class ClientSession {
       this.conn = await connectToHost(this.code, { local: this.local });
       this.conn.onData((m) => this.onMsg(m));
       this.conn.onClose(() => this.onHostLeft());
-      this.conn.send({ t: 'hello', name: this.name, char: this.char });
+      this.conn.send({ t: 'hello', name: this.name, char: this.char, unlocks: this.unlocks });
       this.pingTimer = setInterval(() => this.conn.send({ t: 'ping', c: performance.now() }), 2000);
     } catch (e) {
       this.error = e.message;
@@ -74,6 +79,7 @@ export class ClientSession {
       case 'lobby':
         this.players = m.players;
         if (m.danger !== undefined) this.danger = clampDanger(m.danger);
+        if (m.maxDanger !== undefined) this.maxDanger = clampDanger(m.maxDanger);
         if (!this.inRun) this.state = 'lobby';
         break;
       case 'start':
@@ -127,6 +133,7 @@ export class ClientSession {
     // Replay inputs the host has not processed yet on top of the host position.
     this.frames = this.frames.filter((f) => f.seq > me.lastSeq);
     const target = { x: me.x, y: me.y, r: me.r };
+    if (charging(me)) { this.pred.x = me.x; this.pred.y = me.y; this.frames = []; this.mySpeed = me.spd; return; }
     for (const f of this.frames) predictMove(target, f.mx, f.my, f.spd, f.dt);
     const ex = target.x - this.pred.x, ey = target.y - this.pred.y;
     if (Math.hypot(ex, ey) > HARD_SNAP_PX) { this.pred.x = target.x; this.pred.y = target.y; }
@@ -137,10 +144,12 @@ export class ClientSession {
   phase() { return this.state; }
 
   lobby() {
-    return { code: this.code, isHost: false, myId: this.myId, players: this.players.map((p) => ({ ...p })), local: this.local, danger: this.danger };
+    return { code: this.code, isHost: false, myId: this.myId, players: this.players.map((p) => ({ ...p })), local: this.local, danger: this.danger, maxDanger: this.maxDanger };
   }
 
-  setName(name) { this.name = name; this.conn?.send({ t: 'hello', name, char: this.char }); }
+  setName(name) { this.name = name; this.conn?.send({ t: 'hello', name, char: this.char, unlocks: this.unlocks }); }
+  /** New unlocks after a run: tell the host (for the next run's pool and danger list). */
+  setUnlocks(u) { this.unlocks = u; this.conn?.send({ t: 'hello', name: this.name, char: this.char, unlocks: u }); }
   pick(char) { this.char = char; this.conn?.send({ t: 'pick', char }); }
   setReady(v) { this.ready = v; this.conn?.send({ t: 'ready', value: v }); }
   setDanger() {}   // only the host chooses
@@ -184,7 +193,7 @@ export class ClientSession {
       this.rollCd = R.cooldown;
     }
     this.drSeen = dr;
-    if (this.pred && me && !me.downed && latest.phase === 'wave') {
+    if (this.pred && me && !me.downed && latest.phase === 'wave' && !charging(me)) {
       const base = this.mySpeed || me.spd;
       const rolling = this.rollT > 0;
       if (rolling) this.rollT -= dt;

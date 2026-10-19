@@ -1,6 +1,7 @@
 // DOM UI router over the Phaser canvas. Picks the screen from the session phase, re-renders a
 // screen only when its data changes, and routes clicks (data-act) to the screen modules.
-// Screens: menu.js (menu + settings), lobby.js, shop.js (level-ups + shop), end.js.
+// Screens: menu.js (menu + settings), collection.js (Challenges / Heroes / Danger, opened from the menu), lobby.js,
+// shop.js (level-ups + shop), end.js.
 
 import { sfx } from '../audio/sfx.js';
 import { esc } from './describe.js';
@@ -10,6 +11,7 @@ import { menuScreen, settingsModal, menuActions } from './menu.js';
 import { lobbyScreen, lobbyActions } from './lobby.js';
 import { shopScreen, shopActions } from './shop.js';
 import { endScreen, endActions } from './end.js';
+import { collectionScreen, collectionActions } from './collection.js';
 
 export class UI {
   constructor(app, root) {
@@ -18,15 +20,21 @@ export class UI {
     this.screen = '';
     this.key = '';
     this.settingsOpen = false;
+    this.collectionTab = '';   // '' = closed; 'challenges' | 'heroes' | 'danger' = the Challenges screen is open (no session)
     this.toastT = null;
-    this.actions = { ...this.coreActions(), ...menuActions, ...lobbyActions, ...shopActions, ...endActions };
+    this.actions = { ...this.coreActions(), ...menuActions, ...collectionActions, ...lobbyActions, ...shopActions, ...endActions };
     // Buttons act on mouse-down, so a re-render between press and release (a mate readying up,
     // a network update) can never swallow a click. Keyboard "clicks" (detail 0) still work.
     root.addEventListener('pointerdown', (e) => { if (e.button === 0) this.onClick(e); });
     root.addEventListener('click', (e) => { if (e.detail === 0) this.onClick(e); });
     root.addEventListener('input', (e) => this.onInput(e));
     root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'code') this.act('join'); });
-    app.keys.onEscape = () => { this.settingsOpen = !this.settingsOpen; this.key = ''; };
+    app.keys.onEscape = () => {
+      // On the Challenges screen Esc goes back to the menu (settings are one click away there); anywhere else it toggles settings.
+      if (this.screen === 'collection' && !this.settingsOpen) this.collectionTab = '';
+      else this.settingsOpen = !this.settingsOpen;
+      this.key = '';
+    };
     this.hudTips = new HudTips(app);
     app.onFrame(() => { this.update(); this.hudTips.update(this.screen === 'game'); });
     installTips();
@@ -35,7 +43,7 @@ export class UI {
 
   screenFor() {
     const s = this.app.session;
-    if (!s) return 'menu';
+    if (!s) return this.collectionTab ? 'collection' : 'menu';
     const ph = s.phase();
     if (ph === 'connecting') return 'connecting';
     if (ph === 'error') return 'error';
@@ -64,6 +72,7 @@ export class UI {
     }
     else if (screen === 'end') data = JSON.stringify(s.me()?.result || s.world?.result || null);
     else if (screen === 'error') data = s.error;
+    else if (screen === 'collection') data = this.collectionTab;
     const key = `${screen}|${data}|${this.settingsOpen}`;
     if (key === this.key) return;
     this.screen = screen;
@@ -77,6 +86,7 @@ export class UI {
     const caret = focusId && active.selectionStart;
     let html = '';
     if (screen === 'menu') html = menuScreen(this);
+    else if (screen === 'collection') html = collectionScreen(this);
     else if (screen === 'connecting') html = `<div class="center"><div class="panel small"><h2>Connecting…</h2><p>Finding the herd.</p><button data-act="menu">Cancel</button></div></div>`;
     else if (screen === 'error') html = `<div class="center"><div class="panel small"><h2>Oops</h2><p>${esc(this.app.session.error || 'Something went wrong')}</p><button data-act="menu">Back to menu</button></div></div>`;
     else if (screen === 'lobby') html = lobbyScreen(this);
@@ -139,7 +149,7 @@ export class UI {
       pick: (ui, d) => { ui.app.settings.char = d.char; ui.app.saveSettings(); ui.app.session.pick(d.char); },
       ready: (ui) => ui.app.session.setReady(!ui.app.session.ready),
       start: (ui) => ui.app.session.startRun(),
-      menu: (ui) => { ui.app.endSession(); ui.settingsOpen = false; history.replaceState(null, '', location.pathname); },
+      menu: (ui) => { ui.app.endSession(); ui.settingsOpen = false; ui.collectionTab = ''; history.replaceState(null, '', location.pathname); },
       again: (ui) => ui.app.session.playAgain(),
       closeSettings: (ui) => { ui.settingsOpen = false; },
     };

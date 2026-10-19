@@ -1,10 +1,11 @@
 // Title menu, "How to play" and the settings modal.
 
-import { CHARACTER_IDS, CHARACTERS } from '../data/characters.js';
+import { CHARACTER_IDS, CHARACTERS, STARTER_IDS } from '../data/characters.js';
 import { PLAYER_COLORS_CSS } from '../render/art.js';
 import { loadProgress, isUnlocked, heroProgress } from '../meta/unlocks.js';
 import { esc } from './describe.js';
 import { tip } from './tips.js';
+import { nextGoals, challengesDone, CHALLENGE_COUNT, rewardInfo } from './collection.js';
 
 const SPR = (key) => `assets/sprites/${key}.svg`;
 const DEFAULT_NAMES = ['Rex', 'Chomp', 'Stompy', 'Nibbles', 'Rawr', 'Bonesy', 'Tiny', 'Mango', 'Pebble', 'Fangs'];
@@ -17,8 +18,8 @@ export function defaultName() {
 }
 
 /**
- * The small "Progress" panel on the menu: heroes unlocked, lifetime stats, and how close the nearest locked hero is.
- * Reads this browser's progress (src/meta/unlocks.js); works with no storage (everything at zero).
+ * The small "Progress" panel on the menu: heroes unlocked, challenges done, lifetime stats, how close the nearest locked hero is
+ * and the challenge that is closest to done. Reads this browser's progress (src/meta/unlocks.js); works with no storage.
  */
 export function progressPanel(progress = loadProgress()) {
   const total = CHARACTER_IDS.length;
@@ -39,8 +40,15 @@ export function progressPanel(progress = loadProgress()) {
     ['Kills', t.kills, 'Enemies you have defeated across all runs. Killing 2,000 unlocks Bolt.'],
     ['Amber', t.amber, 'Amber you have collected across all runs. Collecting 1,500 unlocks Goldie.'],
   ].map(([k, v, hint]) => `<span data-tip-text="${esc(hint)}"><b>${f(v)}</b> ${k}</span>`).join('');
-  return `<div class="progress" data-tip-text="Your progress is saved in this browser only. Heroes are unlocked by playing: no codes, no shop.">
-    <div class="phead"><b data-tip-text="Heroes unlocked in this browser. The first four are always open; the other ${total - 4 > 0 ? total - 4 : 0} are earned by playing.">Heroes ${open}/${total}</b>${next ? `<span class="pnext" data-tip-text="${esc(`${CHARACTERS[next.id].name} is the locked hero closest to unlocking: ${next.g.text} (${f(next.g.have)} of ${f(next.g.target)}).`)}">Next: <b>${esc(CHARACTERS[next.id].name)}</b> · ${esc(next.g.text)} (${f(next.g.have)}/${f(next.g.target)})</span>` : '<span class="pnext">Every hero unlocked</span>'}</div>
+  // The unfinished challenge that is closest to done, with the reward waiting.
+  const goal = nextGoals(progress, 1)[0];
+  const goalHtml = goal
+    ? `<span class="pnext" data-tip-text="${esc(`${goal.c.name}: ${goal.c.desc}. Finishing it unlocks ${rewardInfo(goal.c.reward).name}.`)}">Next goal: <b>${esc(goal.c.name)}</b> · ${esc(goal.c.desc)} · ${f(goal.state.have)}/${f(goal.state.target)}</span>`
+    : '<span class="pnext">Every challenge done</span>';
+  const owned = Math.max(0, total - STARTER_IDS.length);
+  return `<div class="progress" data-tip-text="Your progress is saved in this browser only. Heroes, items, weapons and Danger levels are unlocked by playing: no codes, no shop.">
+    <div class="phead"><b data-tip-text="Heroes unlocked in this browser. The first ${STARTER_IDS.length} are always open; the other ${owned} are earned by playing.">Heroes ${open}/${total}</b>${next ? `<span class="pnext" data-tip-text="${esc(`${CHARACTERS[next.id].name} is the locked hero closest to unlocking: ${next.g.text} (${f(next.g.have)} of ${f(next.g.target)}).`)}">Next: <b>${esc(CHARACTERS[next.id].name)}</b> · ${esc(next.g.text)} (${f(next.g.have)}/${f(next.g.target)})</span>` : '<span class="pnext">Every hero unlocked</span>'}</div>
+    <div class="phead pgoal"><b${tip('challenge')}>Challenges ${challengesDone(progress)}/${CHALLENGE_COUNT}</b>${goalHtml}</div>
     <div class="pstats">${chips}</div>
   </div>`;
 }
@@ -61,7 +69,7 @@ export function menuScreen(ui) {
       <button class="big" data-act="host">Host a game</button>
       <div class="joinbox"><input id="code" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false"><button class="big" data-act="join">Join</button></div>
     </div>`}
-    <div class="row links"><button class="ghost" data-act="help">How to play</button><button class="ghost" data-act="settings">Settings</button></div>
+    <div class="row links"><button class="chalbtn" data-act="collection"${tip('challenge')}>Challenges <b>${challengesDone(progress)}/${CHALLENGE_COUNT}</b></button><button class="ghost" data-act="help">How to play</button><button class="ghost" data-act="settings">Settings</button></div>
     ${progressPanel(progress)}
   </div></div>${ui.helpOpen ? howToPlayModal() : ''}`;
 }

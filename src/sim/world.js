@@ -4,6 +4,8 @@
 import { BALANCE } from '../data/balance.js';
 import { WAVES } from '../data/waves.js';
 import { clampDanger } from '../data/danger.js';
+import { ITEM_IDS } from '../data/items.js';
+import { WEAPON_IDS } from '../data/weapons.js';
 import { createRng } from './rng.js';
 import { SpatialHash } from './spatial.js';
 import { createPlayer, emit } from './entities.js';
@@ -29,6 +31,19 @@ import * as downed from './systems/downed.js';
  * @param {{seed?:number, players:{id:number,name?:string,char:string}[], startWave?:number, danger?:number}} opts
  *   danger: index into DANGER (src/data/danger.js), 0 Chill .. 3 Extinction; default 1 (Normal).
  */
+/**
+ * The run's shop/crate pool (docs/PROGRESSION.md): the ids in `pool` that exist, in data order (so the RNG sees the same
+ * list on every machine). Undefined, or too small to make a shop, means everything.
+ */
+export function runPool(pool) {
+  if (!pool) return null;
+  const has = (list) => new Set(Array.isArray(list) ? list : []);
+  const items = has(pool.items), weapons = has(pool.weapons);
+  const out = { items: ITEM_IDS.filter((id) => items.has(id)), weapons: WEAPON_IDS.filter((id) => weapons.has(id)) };
+  if (out.items.length < 12 || out.weapons.length < 4) return null;
+  return out;
+}
+
 export function createWorld(opts) {
   const seed = (opts.seed ?? 1) >>> 0;
   const w = {
@@ -37,6 +52,7 @@ export function createWorld(opts) {
     players: [], enemies: [], projectiles: [], shots: [], pickups: [], hazards: [], summons: [], marks: [],
     nextId: 1, events: [], bag: 0, activeCount: 1, dir: null, bossDead: false, result: null,
     danger: clampDanger(opts.danger),
+    pool: runPool(opts.pool),
     grid: new SpatialHash(80),
   };
   for (const p of opts.players) {
@@ -72,6 +88,7 @@ export function startWave(w, n) {
     if (p.gone) continue;
     recomputeStats(p);
     p.score.amberMark = p.score.amber; // amber earned this wave = score.amber now minus this
+    p.score.hurtThisWave = false;
     p.downed = false;
     p.reviveT = 0;
     p.hp = p.stats.maxHp;
@@ -96,6 +113,7 @@ export function endWave(w) {
     for (const rec of Object.values(p.score.byWeapon || {})) { rec.last = rec.wave || 0; rec.wave = 0; }
     p.score.lastWaveDealt = p.score.waveDealt || 0;
     p.score.waveDealt = 0;
+    if (!p.gone && !p.score.hurtThisWave) p.score.cleanWaves = (p.score.cleanWaves || 0) + 1;
   }
   collectLeftovers(w); // loot crates still on the ground go to the nearest player
   // Uncollected amber goes into the bag and is paid out over the next wave.
@@ -104,6 +122,7 @@ export function endWave(w) {
   w.enemies = []; w.projectiles = []; w.shots = []; w.hazards = []; w.summons = []; w.marks = [];
   for (const p of w.players) {
     if (p.gone) continue;
+    if (p.abState) { p.abState = null; recomputeStats(p); } // buffs (Hot Streak, Overdrive...) end with the wave
     payHarvest(w, p);
     p.score.lastWaveAmber = p.score.amber - (p.score.amberMark ?? p.score.amber); // pickups + Harvesting
   }

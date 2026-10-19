@@ -1,4 +1,4 @@
-// The 8 playable T-Rexes (the first 4 are always unlocked, the others are unlocked by `unlock`, see src/meta/unlocks.js). `stats` adds flat points to stats; `mult` multiplies the final stat.
+// The 10 playable T-Rexes (the first 4 are always unlocked, the others are unlocked by `unlock`, see src/meta/unlocks.js). `stats` adds flat points to stats; `mult` multiplies the final stat.
 // Ability numbers live here too; the behaviour is in src/sim/systems/abilities.js.
 // `trait` is the hero's one rule twist: `name` and `desc` are shown on the lobby card, the other fields are
 // read by the sim (stats.js recomputeStats / weaponDamage / weaponCooldown / abilityCooldown, weapons.js and
@@ -18,8 +18,14 @@
 //   summonDmg, extraSummons   summon weapons (turrets, drones) deal x summonDmg and get +extraSummons of each (meleeDmg works too)
 //   kindleChance, kindleDps, kindleTime   a hit sets the enemy alight with this chance; the burn is kindleDps x the hit per second
 //   burnMult                burn damage this hero deals x burnMult (burn ticks and burning ground; not bleeds)
+//   speedToDamage           +x Damage % for every +1 Speed % (Dash's Momentum; stats.js)
+//   luckToCrit              +x Crit Chance % for every +1 Luck (Lucky Charm; stats.js)
+//   rollCdCut               dodge roll cooldown -x (0.4 = 40% shorter; movement.js startRoll)
+//   critAmber               chance a crit drops 1 amber (Lucky Charm; hooks.js onHit)
+//   abCdCut                 ability cooldown -x (abilityCooldown in stats.js; items can add to it)
 // `unlock` (heroes after the first four): {stat, target, text} read by src/meta/unlocks.js. stat is a lifetime stat there:
-//   bestWave (highest wave reached), amber / kills / wins (totals across runs). `text` is the condition shown in the lobby.
+//   bestWave (highest wave reached), amber / kills / wins / challenges (totals across runs; challenges = challenges done),
+//   bestDangerWin (highest Danger index won, -1 for none). `text` is the condition shown in the lobby.
 
 export const CHARACTERS = {
   brutus: {
@@ -163,9 +169,54 @@ export const CHARACTERS = {
       radius: 170, damage: 14, burnDps: 8, burnTime: 3, knockback: 220,
     },
   },
+  dash: {
+    id: 'dash', name: 'Dash', role: 'Speedster', color: '#e04a3a',
+    blurb: 'Fast, twitchy and never where the teeth are. All that speed turns into damage.',
+    stats: { speed: 15, dodge: 5, attackSpeed: 10, meleeDamage: 1 },
+    mult: { maxHp: 0.9 },
+    weapon: 'raptor_claws',
+    unlock: { stat: 'challenges', target: 8, text: 'Complete 8 challenges' },
+    trait: {
+      name: 'Momentum',
+      desc: 'Every +1% Speed also gives +1% Damage. Dodge rolls recharge 40% faster.',
+      speedToDamage: 1, rollCdCut: 0.4,
+    },
+    ability: {
+      id: 'stampede', name: 'Stampede', cost: 40, cooldown: 9,
+      desc: 'Charge 420 px the way you are moving, unhittable, trampling everything on the way and shoving it aside.',
+      distance: 420, duration: 0.35, damage: 30, knockback: 340, grace: 0.1,
+    },
+  },
+  lucky: {
+    id: 'lucky', name: 'Lucky', role: 'Gambler', color: '#3aa860',
+    blurb: 'Never reads the odds, always seems to win. Crits shake amber loose.',
+    stats: { luck: 25, critChance: 5, damage: 10 },
+    mult: {},
+    weapon: 'slingshot',
+    unlock: { stat: 'bestDangerWin', target: 2, text: 'Win a run on Hard' },
+    trait: {
+      name: 'Lucky Charm',
+      desc: 'Crits have a 12% chance to drop amber. Every 10 Luck gives +1% Crit Chance.',
+      critAmber: 0.12, luckToCrit: 0.1,
+    },
+    ability: {
+      id: 'jackpot', name: 'Jackpot', cost: 50, cooldown: 14,
+      desc: 'Spin for a prize: a Coin Bomb, a full heal with 2 s of safety, an amber shower or +50% damage for 5 s. Luck favours the big ones.',
+      // Coin Bomb: blast around you.
+      radius: 210, damage: 45, knockback: 300,
+      // Lucky Break: full heal, then this many seconds unhittable.
+      invuln: 2,
+      // Amber Shower: amberBase + amberPerWave x wave pickups of 1 amber, thrown out to amberRadius.
+      amberBase: 8, amberPerWave: 1, amberRadius: 150,
+      // Hot Streak: +streak Damage % for streakTime s.
+      streak: 50, streakTime: 5,
+      // Odds (weights): Lucky Break and Hot Streak gain luckOdds weight per point of Luck.
+      odds: { coin: 35, lucky: 15, amber: 35, streak: 15 }, luckOdds: 0.3, luckOddsMax: 45,
+    },
+  },
 };
 
-export const CHARACTER_IDS = ['brutus', 'fern', 'spike', 'sparky', 'pip', 'goldie', 'bolt', 'ash'];
+export const CHARACTER_IDS = ['brutus', 'fern', 'spike', 'sparky', 'pip', 'goldie', 'bolt', 'ash', 'dash', 'lucky'];
 
 /** Heroes that are unlocked from the start (no `unlock` rule). */
 export const STARTER_IDS = CHARACTER_IDS.filter((id) => !CHARACTERS[id].unlock);
