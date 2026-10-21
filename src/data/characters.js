@@ -41,8 +41,8 @@ export const CHARACTERS = {
     },
     ability: {
       id: 'roar', name: 'Roar', cost: 45, cooldown: 12,
-      desc: 'Stuns and hurts enemies within 190 px for 1.5 s and pulls their aggro for 3 s.',
-      radius: 190, stun: 1.5, taunt: 3, damage: 8,
+      desc: 'Stuns and hurts enemies within 210 px for 1.5 s and pulls their aggro for 3 s.',
+      radius: 210, stun: 1.5, taunt: 3, damage: 8,
     },
   },
   fern: {
