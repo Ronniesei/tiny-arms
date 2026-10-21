@@ -533,10 +533,20 @@ export class Fx {
         if (ev.v >= 5 && this.pickT <= 0) { this.pickT = 0.2; this.number(ev.x, ev.y - 22, `+${ev.v}`, AMBER, 19, 0.7, 0.1); }
       } else this.sfxAt('amber', ev.x, ev.y, 0.3, 0, 1.2);
     } else if (ev.kind === 'crate') {
+      // ev.pid = who gets the crate, ev.by = who walked into it. They differ in co-op, where crates are shared out evenly.
+      const shared = ev.by !== undefined && ev.by !== ev.pid;
+      const byMe = (shared ? ev.by : ev.pid) === myId; // I picked it up (it may still have gone to a mate)
       this.ring(ev.x, ev.y, AMBER, 10, 90, 0.45, 8);
       this.spark(ev.x, ev.y, AMBER, 12);
       this.word(ev.x, ev.y - 50, 'CRATE!', AMBER, 26, 1.1);
-      if (mine) { sfx.play('levelup'); sfx.play('buy'); } else this.sfxAt('buy', ev.x, ev.y, 0.6);
+      if (byMe) { sfx.play('levelup'); sfx.play('buy'); } else if (mine) sfx.play('buy'); else this.sfxAt('buy', ev.x, ev.y, 0.6);
+      if (shared) {
+        // Say where it went: a word over the player who gets it (the hero list is in the current view).
+        const to = this.scene.app?.session?.view?.()?.players?.find((q) => q.id === ev.pid);
+        const name = String(to?.name || `P${ev.pid + 1}`).slice(0, 12);
+        const x = to ? to.x : ev.x, y = to ? to.y - 64 : ev.y - 80;
+        this.word(x, y, mine ? '+1 CRATE' : `CRATE for ${name}`, mine ? GREEN : AMBER, 24, 1.3);
+      }
     } else {
       this.puff(ev.x, ev.y, GREEN, 8);
       this.plus(ev.x, ev.y, 3);
@@ -580,6 +590,12 @@ export class Fx {
 
   onExplode(ev) {
     const r = ev.r || 70;
+    if (ev.fire) {
+      // Ember Staff burst: it happens several times a second, so a small flare with no shake or boom.
+      this.ring(ev.x, ev.y, 0xff8a3a, r * 0.3, r, 0.25, 6);
+      this.spark(ev.x, ev.y, 0xffb040, 5);
+      return;
+    }
     this.ring(ev.x, ev.y, 0xffa040, r * 0.3, r, 0.32, 11);
     this.ring(ev.x, ev.y, 0xfff4dc, r * 0.15, r * 0.7, 0.22, 5, 0.02);
     this.disc(ev.x, ev.y, 0xffc060, r * 0.2, r * 0.85, 0.2, 0.55);

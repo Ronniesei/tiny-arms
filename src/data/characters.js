@@ -36,8 +36,8 @@ export const CHARACTERS = {
     weapon: 'bone_club',
     trait: {
       name: 'Thick Skull',
-      desc: 'Melee weapons deal +15% damage, ranged weapons -30%. +1 Armor every 4 levels.',
-      meleeDmg: 1.15, rangedDmg: 0.7, armorEvery: 4, armorPer: 1,
+      desc: 'Melee weapons deal +5% damage, ranged weapons -30%. +1 Armor every 4 levels.',
+      meleeDmg: 1.05, rangedDmg: 0.7, armorEvery: 4, armorPer: 1,
     },
     ability: {
       id: 'roar', name: 'Roar', cost: 45, cooldown: 12,

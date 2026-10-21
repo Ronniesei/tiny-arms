@@ -101,9 +101,10 @@ export function collect(w, p, pk) {
     shareAmber(w, p, pk);
     if (p.specials?.vacuum > 0) grantXp(w, p, SPECIAL_RULES.vacuumXp * p.specials.vacuum); // Amber Vacuum
   } else if (pk.kind === 'crate') {
-    storeCrate(w, p, pk);
+    const to = storeCrate(w, p, pk); // co-op: the crate may go to a mate (crates.js crateReceiver); the picker is still healed
     healPlayer(w, p, CRATE_RULES.heal, p.id);
-    emit(w, { type: 'pickup', pid: p.id, kind: 'crate', v: pk.v, x: Math.round(pk.x), y: Math.round(pk.y) });
+    // pid = who gets the crate, by = who picked it up (they differ when it is shared out)
+    emit(w, { type: 'pickup', pid: to.id, by: p.id, kind: 'crate', v: pk.v, x: Math.round(pk.x), y: Math.round(pk.y) });
   } else if (pk.kind === 'berry') {
     const mult = CHARACTERS[p.char]?.trait?.berryHeal ?? 1; // Fern's Green Thumb
     healPlayer(w, p, Math.max(2, Math.round(p.stats.maxHp * BALANCE.pickups.berryHealPct)) * mult, p.id);

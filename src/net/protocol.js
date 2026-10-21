@@ -4,7 +4,8 @@
 // View shape (what the renderer, HUD and client bot read):
 //   { tick, phase, wave, waveDur, timeLeft, shopTime, bag,
 //     players:  [{id, name, char, x, y, r, hp, maxHp, mana, maxMana, facing, moving, downed, gone,
-//                 reviveP, flash, iframes, casting, amber, level, spd, weapons:[{wid,tier}], lastSeq, abCd, abCost, rolling, rollCd}],
+//                 reviveP, flash, iframes, casting, amber, level, spd, weapons:[{wid,tier}], lastSeq, abCd, abCost, rolling, rollCd,
+//                 herd, crates (loot crates held this wave)}],
 //     enemies:  [{id, type, x, y, r, hpP, facing, flash, stun, burn, elite, boss, tele}],
 //     projectiles: [{id, kind, x, y, a}], shots: [{id, x, y}], pickups: [{id, kind:'amber'|'berry'|'crate', x, y, gold?}],
 //     hazards:  [{id, kind, x, y, r, p, owner, cur}], summons: [{id, kind, pid, x, y, a}], marks: [{x, y, p, type}] }
@@ -45,6 +46,7 @@ export function encodeSnap(w) {
       r1((pl.reviveT / BALANCE.revive.time) * 100), r1(moveSpeed(pl.stats) * (pl.abState?.speedMult || 1)),
       pl.amber, pl.level, pl.weapons.map(weaponCode), pl.lastSeq, CHARACTER_IDS.indexOf(pl.char), pl.abCd > 0 ? r1(pl.abCd * 10) : 0,
       abilityCost(pl, CHARACTERS[pl.char].ability.cost), pl.rollCd > 0 ? r1(pl.rollCd * 10) : 0, herdShown(pl),
+      (pl.crates || []).length, // 19: loot crates held this wave (the HUD badge)
     ]);
   }
   const e = [];
@@ -92,7 +94,7 @@ export function decodeSnap(sn, names = {}) {
       x: q[1], y: q[2], r: BALANCE.player.radius, hp: q[3], maxHp: q[4], mana: q[5], maxMana: q[6],
       facing: f & 1 ? -1 : 1, moving: !!(f & 2), downed: !!(f & 4), gone: !!(f & 8), flash: !!(f & 16),
       iframes: !!(f & 32), casting: !!(f & 64), reviveP: q[8] / 100, spd: q[9], amber: q[10], level: q[11],
-      weapons: q[12].map(decodeWeapon), lastSeq: q[13], abCd: q[15] / 10, abCost: q[16], rolling: !!(f & 128), rollCd: (q[17] || 0) / 10, herd: q[18] || 0,
+      weapons: q[12].map(decodeWeapon), lastSeq: q[13], abCd: q[15] / 10, abCost: q[16], rolling: !!(f & 128), rollCd: (q[17] || 0) / 10, herd: q[18] || 0, crates: q[19] || 0,
     };
   });
   const teles = {};

@@ -2,8 +2,10 @@
 //
 //   drop    a normal kill drops a crate pickup with a small chance (CRATE_RULES.chance, a bit higher with Luck; at most
 //           CRATE_RULES.maxPerWave per player and wave); an elite always drops one.
-//   pickup  walking into it stores it on the player (p.crates) and heals CRATE_RULES.heal HP (pickups.js collect()).
-//           Crates still on the ground when the wave ends go to the nearest player.
+//   pickup  walking into it stores it on a player (p.crates) and heals the picker CRATE_RULES.heal HP (pickups.js collect()).
+//           In co-op the crate goes to whoever has received the fewest so far this run (crateReceiver, p.score.crates), not
+//           always the picker, so everyone ends up with about the same number. The HUD shows the held count by the portrait.
+//           Crates still on the ground when the wave ends go to the nearest player (by the same rule).
 //   offer   at wave end every stored crate becomes an offer in p.crateOffers: an item rolled like a shop item (the shop's
 //           rarity odds, Luck, hero and tag leaning, item limits). An elite's crate rolls the rarity twice and keeps the best.
 //   choose  in the shop, op {op:'crate', idx, take:true|false, cid?}: Take adds the item to your build, Recycle pays
@@ -42,9 +44,30 @@ export function maybeDropCrate(w, e, def, pid) {
   return pk;
 }
 
-/** A player walked into a crate pickup (pickups.js collect). */
+/**
+ * Who a crate that `picker` found goes to. Co-op with CRATE_RULES.shareEvenly (as in Brotato): the player still in the run
+ * (downed mates count, gone ones do not) who has received the fewest crates this run (score.crates). A tie goes to the
+ * picker; if the picker is not among the tied, the lowest player id of them. Solo, or with the rule off: the picker.
+ */
+export function crateReceiver(w, picker) {
+  if (!CRATE_RULES.shareEvenly) return picker;
+  let fewest = Infinity;
+  for (const q of w.players) if (!q.gone) fewest = Math.min(fewest, q.score?.crates || 0);
+  if ((picker.score?.crates || 0) <= fewest) return picker;
+  let best = null;
+  for (const q of w.players) {
+    if (q.gone || (q.score?.crates || 0) !== fewest) continue;
+    if (!best || q.id < best.id) best = q;
+  }
+  return best || picker;
+}
+
+/** A player walked into a crate pickup (pickups.js collect). Returns the player who receives it (see crateReceiver). */
 export function storeCrate(w, p, pk) {
-  (p.crates || (p.crates = [])).push({ elite: pk.v >= 2 });
+  const to = crateReceiver(w, p);
+  (to.crates || (to.crates = [])).push({ elite: pk.v >= 2 });
+  to.score.crates = (to.score.crates || 0) + 1;
+  return to;
 }
 
 /** The wave is over (world.endWave, before the ground is cleared): loose crates go to the nearest player. */

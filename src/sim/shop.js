@@ -48,6 +48,8 @@ export const HERO_LEAN = {
   goldie: ['harvesting', 'luck', 'rangedDamage', 'pickupRange'],
   bolt: ['rangedDamage', 'abilityPower', 'attackSpeed', 'range'],
   ash: ['abilityPower', 'rangedDamage', 'maxHp', 'attackSpeed'],
+  dash: ['speed', 'attackSpeed', 'damage', 'meleeDamage'],
+  lucky: ['luck', 'critChance', 'rangedDamage', 'harvesting'],
 };
 
 /** Does this item raise (positive value) at least one of the stats? */

@@ -10,17 +10,19 @@
 //   so a build snowballs.
 // limit: max copies a player can hold (the shop stops offering it). price: base price before wave inflation.
 // Icons are assets/sprites/i_<id>.svg.
+// Speed budget (playtest 21 Oct): a -speed stat sits only on items that earn it (armor, melee, a strong special), each tier has about as many
+//   +speed items as -speed ones, and every tier has at least one +speed item. Dash and Momentum Horn turn speed into damage, so keep item speed modest.
 
 export const ITEMS = {
   // ---- Tier 1 (common) ----
   sharp_tooth:  { id: 'sharp_tooth',  name: 'Sharp Tooth',  tier: 1, price: 14, icon: 'i_sharp_tooth', tags: ['damage'],  stats: { damage: 8 } },
-  thick_hide:   { id: 'thick_hide',   name: 'Thick Hide',   tier: 1, price: 14, icon: 'i_thick_hide', tags: ['defense'],   stats: { armor: 2, speed: -5 } },
+  thick_hide:   { id: 'thick_hide',   name: 'Thick Hide',   tier: 1, price: 14, icon: 'i_thick_hide', tags: ['defense'],   stats: { armor: 2, speed: -3 } },
   big_heart:    { id: 'big_heart',    name: 'Big Heart',    tier: 1, price: 14, icon: 'i_big_heart', tags: ['defense'],    stats: { maxHp: 5 } },
   fast_feet:    { id: 'fast_feet',    name: 'Fast Feet',    tier: 1, price: 14, icon: 'i_fast_feet', tags: ['speed'],    stats: { speed: 8, armor: -1 }, limit: 6 },
   fern_snack:   { id: 'fern_snack',   name: 'Fern Snack',   tier: 1, price: 13, icon: 'i_fern_snack', tags: ['sustain'],   stats: { hpRegen: 3 } },
   shiny_pebble: { id: 'shiny_pebble', name: 'Shiny Pebble', tier: 1, price: 12, icon: 'i_shiny_pebble', tags: ['luck'], stats: { luck: 12 } },
   bone_charm:   { id: 'bone_charm',   name: 'Bone Charm',   tier: 1, price: 15, icon: 'i_bone_charm', tags: ['melee'],   stats: { meleeDamage: 2 } },
-  feather:      { id: 'feather',      name: 'Feather',      tier: 1, price: 15, icon: 'i_feather', tags: ['ranged'],      stats: { rangedDamage: 2, maxHp: -3 } },
+  feather:      { id: 'feather',      name: 'Feather',      tier: 1, price: 15, icon: 'i_feather', tags: ['ranged', 'speed'],      stats: { rangedDamage: 2, speed: 4, maxHp: -3 } },
   egg_shell:    { id: 'egg_shell',    name: 'Egg Shell',    tier: 1, price: 13, icon: 'i_egg_shell', tags: ['defense'],    stats: { dodge: 8, armor: -1 }, limit: 5 },
   mud_bath:     { id: 'mud_bath',     name: 'Mud Bath',     tier: 1, price: 13, icon: 'i_mud_bath', tags: ['defense'],     stats: { armor: 3, dodge: -5 } },
   glow_moss:    { id: 'glow_moss',    name: 'Glow Moss',    tier: 1, price: 12, icon: 'i_glow_moss', tags: ['mana'],    stats: { manaRegen: 1.5 } },
@@ -28,17 +30,17 @@ export const ITEMS = {
 
   // ---- Tier 2 (uncommon) ----
   war_paint:     { id: 'war_paint',     name: 'War Paint',     tier: 2, price: 32, icon: 'i_war_paint', tags: ['damage', 'crit'],     stats: { damage: 12, critChance: 6, armor: -2 } },
-  turtle_shell:  { id: 'turtle_shell',  name: 'Turtle Shell',  tier: 2, price: 30, icon: 'i_turtle_shell', tags: ['defense'],  stats: { armor: 5, speed: -10 } },
+  turtle_shell:  { id: 'turtle_shell',  name: 'Turtle Shell',  tier: 2, price: 30, icon: 'i_turtle_shell', tags: ['defense'],  stats: { armor: 5, speed: -8 } },
   long_neck:     { id: 'long_neck',     name: 'Long Neck',     tier: 2, price: 28, icon: 'i_long_neck', tags: ['ranged'],     stats: { range: 25, attackSpeed: -10 } },
   raptor_claw:   { id: 'raptor_claw',   name: 'Raptor Claw',   tier: 2, price: 34, icon: 'i_raptor_claw', tags: ['crit', 'speed'],   stats: { critChance: 8, attackSpeed: 12, maxHp: -4 } },
   magnet_rock:   { id: 'magnet_rock',   name: 'Magnet Rock',   tier: 2, price: 28, icon: 'i_magnet_rock', tags: ['greed'],   stats: { pickupRange: 40, harvesting: 5 }, limit: 4 },
   mana_crystal:  { id: 'mana_crystal',  name: 'Mana Crystal',  tier: 2, price: 30, icon: 'i_mana_crystal', tags: ['mana'],  stats: { maxMana: 40, abilityPower: 15 } },
   vampire_bat:   { id: 'vampire_bat',   name: 'Vampire Bat',   tier: 2, price: 36, icon: 'i_vampire_bat', tags: ['sustain'],   stats: { lifeSteal: 4, hpRegen: -2 }, limit: 4 },
-  coffee_bean:   { id: 'coffee_bean',   name: 'Coffee Bean',   tier: 2, price: 32, icon: 'i_coffee_bean', tags: ['speed'],   stats: { attackSpeed: 18, hpRegen: -3 } },
+  coffee_bean:   { id: 'coffee_bean',   name: 'Coffee Bean',   tier: 2, price: 32, icon: 'i_coffee_bean', tags: ['speed'],   stats: { attackSpeed: 16, speed: 5, hpRegen: -3 } },
   volcano_ash:   { id: 'volcano_ash',   name: 'Volcano Ash',   tier: 2, price: 34, icon: 'i_volcano_ash', tags: ['crit'],   stats: { critChance: 5 }, special: { burnOnCrit: 1 }, limit: 1, desc: 'Your crits set enemies on fire.' },
 
   // ---- Tier 3 (rare) ----
-  trex_skull:   { id: 'trex_skull',   name: 'T-Rex Skull',  tier: 3, price: 58, icon: 'i_trex_skull', tags: ['damage', 'melee'],   stats: { damage: 22, meleeDamage: 3, speed: -10 } },
+  trex_skull:   { id: 'trex_skull',   name: 'T-Rex Skull',  tier: 3, price: 58, icon: 'i_trex_skull', tags: ['damage', 'melee'],   stats: { damage: 22, meleeDamage: 3, speed: -8 } },
   comet_shard:  { id: 'comet_shard',  name: 'Comet Shard',  tier: 3, price: 54, icon: 'i_comet_shard', tags: ['mana'],  stats: { abilityPower: 40, manaRegen: 3, maxHp: -6 } },
   golden_egg:   { id: 'golden_egg',   name: 'Golden Egg',   tier: 3, price: 52, icon: 'i_golden_egg', tags: ['greed'],   stats: { harvesting: 4 }, special: { lowHpAmber: 1 }, limit: 1, desc: '+1 amber per kill while you are below 50% HP.' },
   herd_bond:    { id: 'herd_bond',    name: 'Herd Bond',    tier: 3, price: 50, icon: 'i_herd_bond', tags: ['mana'],    stats: { maxHp: 4, manaRegen: 1 }, special: { herdBond: 40 }, limit: 1, desc: 'Reviving a mate gives you both 40 mana.' },
@@ -68,7 +70,7 @@ export const ITEMS = {
   // ---- Tier 2 ----
   dino_dynamite:  { id: 'dino_dynamite',  name: 'Dino Dynamite',  tier: 2, price: 34, icon: 'i_dino_dynamite',  tags: ['explosive'], stats: {},
     special: { killBoom: 0.12 }, limit: 4, desc: 'Kills have a 12% chance to explode for 60% of the killing hit. Chances stack.' },
-  boom_boots:     { id: 'boom_boots',     name: 'Boom Boots',     tier: 2, price: 32, icon: 'i_boom_boots',     tags: ['explosive', 'speed'], stats: {},
+  boom_boots:     { id: 'boom_boots',     name: 'Boom Boots',     tier: 2, price: 32, icon: 'i_boom_boots',     tags: ['explosive', 'speed'], stats: { speed: 6 },
     special: { rollBomb: 1 }, limit: 1, desc: 'Your dodge roll drops a bomb that explodes 0.6 s later.' },
   bouncy_pebbles: { id: 'bouncy_pebbles', name: 'Bouncy Pebbles', tier: 2, price: 34, icon: 'i_bouncy_pebbles', tags: ['ranged'], stats: {},
     special: { bounceHit: 1 }, limit: 3, desc: 'Your projectiles bounce to 1 nearby enemy after hitting, for 70% damage.' },
@@ -78,7 +80,7 @@ export const ITEMS = {
     special: { critHeal: 1 }, limit: 3, desc: 'Crits heal 1 HP (up to 3 HP per second).' },
   amber_vacuum:   { id: 'amber_vacuum',   name: 'Amber Vacuum',   tier: 2, price: 30, icon: 'i_amber_vacuum',   tags: ['greed'], stats: {},
     special: { vacuum: 1 }, limit: 1, desc: 'Amber flies to you from twice as far and gives +1 XP each.' },
-  shockwave_club: { id: 'shockwave_club', name: 'Shockwave Club', tier: 2, price: 36, icon: 'i_shockwave_club', tags: ['melee'], stats: { meleeDamage: 2, speed: -5 },
+  shockwave_club: { id: 'shockwave_club', name: 'Shockwave Club', tier: 2, price: 36, icon: 'i_shockwave_club', tags: ['melee'], stats: { meleeDamage: 2, speed: -3 },
     special: { shockwave: 0.2, meleeKb: 0.5 }, limit: 2, desc: 'Melee hits knock enemies back harder, into the ones behind them, who take 20% of the hit.' },
   hoard_heart:    { id: 'hoard_heart',    name: 'Hoard Heart',    tier: 2, price: 34, icon: 'i_hoard_heart',    tags: ['greed', 'damage'], stats: {},
     special: { hoard: 1 }, limit: 1, desc: '+1% damage for every 25 amber you hold (max +40%). Spend it and the bonus fades.' },
@@ -96,7 +98,7 @@ export const ITEMS = {
     special: { chainZap: 1 }, limit: 2, desc: 'Crits zap the nearest other enemy within 160 px for 50% damage.' },
   spell_echo:     { id: 'spell_echo',     name: 'Spell Echo',     tier: 3, price: 54, icon: 'i_spell_echo',     tags: ['mana'], stats: { manaRegen: -1 },
     special: { spellEcho: 1 }, limit: 1, desc: 'Your ability fires a second, 50% strength copy 0.4 s later, for no extra mana.' },
-  berserker_sap:  { id: 'berserker_sap',  name: 'Berserker Sap',  tier: 3, price: 50, icon: 'i_berserker_sap',  tags: ['cursed', 'speed'], stats: { armor: -3 },
+  berserker_sap:  { id: 'berserker_sap',  name: 'Berserker Sap',  tier: 3, price: 50, icon: 'i_berserker_sap',  tags: ['cursed', 'speed'], stats: { speed: 8, armor: -3 },
     special: { berserkAs: 30 }, limit: 1, desc: '+30% attack speed while you are below half HP.' },
 
   // ---- Tier 4 ----
@@ -112,11 +114,11 @@ export const ITEMS = {
   cave_painting:  { id: 'cave_painting',  name: 'Cave Painting',  tier: 1, price: 15, icon: 'i_cave_painting',  tags: ['damage', 'mana'], stats: { damage: 6, abilityPower: 8 } },
 
   // ---- Tier 2 ----
-  rolling_stone:  { id: 'rolling_stone',  name: 'Rolling Stone',  tier: 2, price: 34, icon: 'i_rolling_stone',  tags: ['speed', 'melee'], stats: { speed: 5 },
+  rolling_stone:  { id: 'rolling_stone',  name: 'Rolling Stone',  tier: 2, price: 34, icon: 'i_rolling_stone',  tags: ['speed', 'melee'], stats: { speed: 8 },
     special: { rollCdCut: 0.25, rollBowl: 1 }, limit: 2, desc: 'Dodge roll cooldown -25%. Rolling through enemies bowls them over for damage and knockback.' },
-  adrenaline_gland: { id: 'adrenaline_gland', name: 'Adrenaline Gland', tier: 2, price: 34, icon: 'i_adrenaline_gland', tags: ['speed', 'damage'], stats: { speed: 3 },
+  adrenaline_gland: { id: 'adrenaline_gland', name: 'Adrenaline Gland', tier: 2, price: 34, icon: 'i_adrenaline_gland', tags: ['speed', 'damage'], stats: { speed: 5 },
     special: { adrenaline: 1 }, limit: 1, desc: 'After a dodge roll: +20% damage and +25% attack speed for 2 s.' },
-  quill_coat:     { id: 'quill_coat',     name: 'Quill Coat',     tier: 2, price: 32, icon: 'i_quill_coat',     tags: ['defense'], stats: { armor: 2, speed: -4 },
+  quill_coat:     { id: 'quill_coat',     name: 'Quill Coat',     tier: 2, price: 32, icon: 'i_quill_coat',     tags: ['defense'], stats: { armor: 2, speed: -3 },
     special: { thorns: 1.5 }, limit: 3, desc: 'An enemy that hits you in contact takes 150% of that hit back (at least 3).' },
   four_leaf_fern: { id: 'four_leaf_fern', name: 'Four-Leaf Fern', tier: 2, price: 30, icon: 'i_four_leaf_fern', tags: ['luck', 'sustain'], stats: { luck: 18, hpRegen: 2 } },
   herd_horn:      { id: 'herd_horn',      name: 'Herd Horn',      tier: 2, price: 30, icon: 'i_herd_horn',      tags: ['defense'], stats: { maxHp: 4, hpRegen: 1 },
@@ -139,7 +141,7 @@ export const ITEMS = {
     special: { critAmber: 0.08 }, limit: 2, desc: 'Crits have an 8% chance to drop 1 amber.' },
   big_bang:       { id: 'big_bang',       name: 'Big Bang',       tier: 4, price: 96, icon: 'i_big_bang',       tags: ['explosive'], stats: { abilityPower: 20 },
     special: { blastSize: 0.4, blastDmg: 0.2, killBoom: 0.1 }, limit: 1, desc: '+40% explosion size and +20% damage for all your explosions. Kills have a 10% chance to explode.' },
-  time_amber:     { id: 'time_amber',     name: 'Time Amber',     tier: 4, price: 92, icon: 'i_time_amber',     tags: ['mana'], stats: { maxMana: 40, manaRegen: 1 },
+  time_amber:     { id: 'time_amber',     name: 'Time Amber',     tier: 4, price: 92, icon: 'i_time_amber',     tags: ['mana', 'speed'], stats: { maxMana: 40, manaRegen: 1, speed: 10 },
     special: { abCdCut: 0.25 }, limit: 2, desc: 'Your ability cooldown is 25% shorter.' },
 };
 
@@ -213,6 +215,7 @@ export const CRATE_RULES = {
   heal: 3,             // HP healed when a crate is picked up
   recycle: 0.25,       // Recycle pays this fraction of the item's shop price in amber
   eliteRolls: 2,       // an elite or boss crate rolls the rarity this many times and keeps the best
+  shareEvenly: true,   // co-op: a crate goes to whoever in the run has had the fewest so far (a tie: the picker), as in Brotato
 };
 
 /** Shop offer rules (slots, prices and reroll growth are in BALANCE.shop). */

@@ -83,10 +83,11 @@ export const WEAPONS = {
   ember_staff: {
     id: 'ember_staff', name: 'Ember Staff', cls: 'volcanic', kind: 'ranged', behaviour: 'projectile',
     price: 24, sprite: 'w_ember_staff', projectile: 'p_ember',
-    dmg: [4, 7, 11, 18], cooldown: [1.0, 0.92, 0.84, 0.76],
+    dmg: [6, 10, 16, 25], cooldown: [1.0, 0.92, 0.84, 0.76],
     range: 400, speed: 700, pierce: 0, knockback: 20,
-    burn: { dps: [4, 6, 9, 14], time: 2.5 }, // burn dps x Ability Power
-    scaling: { rangedDamage: 0.7, abilityPower: 0.15 }, critChance: 3, critMult: 1.5,
+    burn: { dps: [4, 6, 9, 14], time: 3 }, // burn dps x Ability Power
+    burst: { r: [45, 55, 65, 75], frac: 0.4 }, // the bolt bursts: nearby enemies take 40% of the hit and catch the burn
+    scaling: { rangedDamage: 0.5, abilityPower: 0.35 }, critChance: 3, critMult: 1.5, // an Ability Power weapon (Ash)
     desc: 'Fireballs that set enemies alight. Burn grows with Ability Power.',
   },
 

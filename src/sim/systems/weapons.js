@@ -195,6 +195,7 @@ export const BEHAVIOURS = {
         pr.burnDps = tierVal(def.burn.dps, wpn.tier) * abilityMult(p.stats);
         pr.burnTime = def.burn.time;
       }
+      if (def.burst) pr.burst = { r: tierVal(def.burst.r, wpn.tier), frac: def.burst.frac }; // Ember Staff (projectiles.js)
     }
     emit(w, { type: 'shoot', pid: p.id, slot, a: +ang.toFixed(2), wid: def.id });
   },

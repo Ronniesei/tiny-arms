@@ -11,6 +11,8 @@ const SPOTS = [
   { box: [164, 24, 240, 54], gloss: 'maxHp', text: 'Your HP bar. At 0 you go down (in co-op a mate can revive you).' },
   { box: [164, 78, 240, 36], gloss: 'mana' },
   { box: [160, 114, 150, 52], gloss: 'amber', text: 'This number is the amber you have right now.' },
+  // Crate badge (hud.js CRATE_BADGE.box), only while you hold a crate this wave. Sits on top of the portrait spot.
+  { box: [92, 122, 66, 54], gloss: 'crate', text: 'The number is the crates you hold this wave. In co-op crates are shared out evenly: the next one you walk into may go to a mate, so everyone ends up with about the same.', crate: true },
   { box: [310, 114, 94, 52], gloss: 'xp' },
   { box: [20, 186, 420, 32], gloss: 'herd' },
   { box: [810, 20, 300, 130], text: 'Wave and time left. Survive until the timer hits 0; each wave builds to a rush at the end. Wave 20 is the boss.' },
@@ -34,6 +36,7 @@ export class HudTips {
       if (s.gloss) d.setAttribute('data-gloss', s.gloss);
       if (s.text) d.setAttribute('data-tip-text', s.text);
       if (s.ability) d.className = 'ability';
+      if (s.crate) d.className = 'crate';
       d.dataset.box = s.box.join(',');
       layer.appendChild(d);
     }
@@ -62,6 +65,8 @@ export class HudTips {
     const s = this.app.session;
     const me = s?.view?.()?.players.find((p) => p.id === s.myId);
     const c = me && CHARACTERS[me.char];
+    // The crate spot only exists while the badge is showing.
+    for (const d of this.layer.querySelectorAll('.crate')) d.style.display = me && me.crates > 0 ? '' : 'none';
     for (const ab of this.layer.querySelectorAll('.ability')) {
       if (!c || ab.dataset.char === c.id) continue;
       ab.dataset.char = c.id;

@@ -2,7 +2,8 @@
 // Reads only the view (`v`), the private view (`me`) and `app`; never touches the sim.
 //
 // Layout (all coordinates are screen pixels of the 1920x1080 HUD camera):
-//   top-left      you: portrait, HP, mana, amber, level, XP bar
+//   top-left      you: portrait, HP, mana, amber, level, XP bar; a crate badge on the portrait's bottom-right corner while
+//                 you hold loot crates this wave (icon and "x2"; pops when the count goes up)
 //   top-centre    wave and countdown (red in the last 5 s); on the boss wave the boss name and HP bar
 //   top-right     allies: portrait, HP, DOWN and revive progress
 //   bottom-centre ability button: icon, cooldown sweep, mana cost, SPACE key
@@ -25,6 +26,9 @@ const ALLY_SLOTS = 3;
 const THREAT_SLOTS = 2;   // off-screen arrows to elites / the boss
 
 const PAD = { x: 20, y: 20, w: 384, h: 166 };      // my panel
+// Loot-crate badge on the portrait's bottom-right corner (design space; src/ui/hudtips.js has a hover spot over `box`; keep them in step).
+// Disc + crate icon at (x, y); the "x2" chip overlaps the icon's lower right. Clear of the amber icon (x 162+) and the XP bar (x 164+).
+const CRATE_BADGE = { x: 118, y: 148, r: 24, icon: 48, chipX: 141, chipY: 164, box: [92, 122, 66, 54] };
 const AB = { x: 960, y: 940, r: 58 };               // ability button
 const ZONE = { mx: 86, my: 86 };                    // arrow inset from the screen edge
 
@@ -69,6 +73,7 @@ export class Hud {
     this.hurtT = 0;
     this.lvUpT = 0;
     this.amberPop = 0;
+    this.cratePop = 0;
     this.hpTrail = 1;
     this.bossTrail = 1;
     this.lastChar = '';
@@ -94,11 +99,16 @@ export class Hud {
     this.allyPortraits = Array.from({ length: ALLY_SLOTS }, () => img('h_spike', 54));
     this.arrowPortraits = Array.from({ length: ALLY_SLOTS }, () => img('h_spike', 40));
     this.g2 = add(scene.add.graphics());
+    // Crate badge: disc, icon, then the count chip (each drawn above the last), all above the portrait.
+    this.gCrate = add(scene.add.graphics());
+    this.crateIcon = img('crate', CRATE_BADGE.icon);
+    this.gChip = add(scene.add.graphics());
 
     this.hpText = txt(PAD.x + 144 + 114, 58, 25);
     this.manaText = txt(PAD.x + 144 + 114, 98, 19);
     this.amberText = txt(204, 136, 30, AMBER, [0, 0.5]);
     this.levelText = txt(392, 136, 24, CREAM, [1, 0.5]);
+    this.crateText = txt(CRATE_BADGE.chipX, CRATE_BADGE.chipY, 17, CREAM, [0.5, 0.5]);
     this.herdText = txt(PAD.x + 6, PAD.y + PAD.h + 18, 19, '#7dff6a', [0, 0.5]);
     this.waveText = txt(960, 44, 26);
     this.timerText = txt(960, 100, 68);
@@ -182,6 +192,8 @@ export class Hud {
     this.t += dt;
     this.g.clear();
     this.g2.clear();
+    this.gCrate.clear();
+    this.gChip.clear();
     this.debug(v, app);
 
     const show = !!v && v.phase === 'wave';
@@ -266,6 +278,30 @@ export class Hud {
     // The world shows "LEVEL UP!" over the T-Rex; here the level number just pops.
     this.lvUpT = Math.max(0, this.lvUpT - dt);
     this.levelText.setScale(1 + 0.35 * clamp01(this.lvUpT / 0.6) * (this.lvUpT > 0 ? 1 : 0));
+
+    this.drawCrates(p, dt);
+  }
+
+  /**
+   * Loot crates held this wave (Brotato shows this near your health): a crate icon on the portrait's bottom-right with an
+   * "x2" count. Only while you hold at least one; it pops when the count goes up (your pickup, or a mate's shared out to you).
+   */
+  drawCrates(p, dt) {
+    const n = p.crates | 0;
+    this.cratePop = Math.max(0, this.cratePop - dt * 3.5);
+    if (this.lastCrates !== undefined && n > this.lastCrates) this.cratePop = 1;
+    this.lastCrates = n;
+    this.crateIcon.setVisible(n > 0);
+    this.crateText.setVisible(n > 0);
+    if (n <= 0) return;
+    const B = CRATE_BADGE, k = 1 + 0.4 * this.cratePop;
+    this.gCrate.fillStyle(0x4a3522, 1).fillCircle(B.x, B.y, B.r * k);
+    this.gCrate.lineStyle(4, 0xc98a3c, 1).strokeCircle(B.x, B.y, B.r * k);
+    this.crateIcon.setPosition(B.x, B.y - 1).setDisplaySize(B.icon * k, B.icon * k).setAlpha(p.downed ? 0.6 : 1);
+    put(this.crateText, `x${n}`).setPosition(B.chipX, B.chipY + 1).setScale(k);
+    const cw = Math.max(30, this.crateText.width + 10) * k, ch = 20 * k;
+    this.gChip.fillStyle(DARKER, 1).fillRoundedRect(B.chipX - cw / 2, B.chipY - ch / 2, cw, ch, ch / 2);
+    this.gChip.lineStyle(3, 0xc98a3c, 1).strokeRoundedRect(B.chipX - cw / 2, B.chipY - ch / 2, cw, ch, ch / 2);
   }
 
   drawWave(v) {

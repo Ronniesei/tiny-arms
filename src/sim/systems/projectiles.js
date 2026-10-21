@@ -54,6 +54,20 @@ export function addFire(w, pid, x, y, r, dur, dps, wuid = 0) {
   return spawnHazard(w, { kind: 'fire', owner: 'player', pid, x, y, r, dur, dps, wuid });
 }
 
+/**
+ * Ember Staff: the bolt bursts where it lands. Every other enemy within burst.r takes burst.frac of the hit and catches
+ * the bolt's burn, so Ash's fire spreads through a crowd (Ronnie, 21 Oct: the staff fell far behind a melee club).
+ */
+function fireBurst(w, pr, e0, dmg) {
+  const b = pr.burst;
+  emit(w, { type: 'explode', x: Math.round(e0.x), y: Math.round(e0.y), r: b.r, pid: pr.pid, fire: 1 });
+  for (const e of w.grid.query(e0.x, e0.y, b.r + 30)) {
+    if (e === e0 || e.dead || Math.hypot(e.x - e0.x, e.y - e0.y) > b.r + e.r) continue;
+    hitEnemy(w, e, dmg * b.frac, { pid: pr.pid, source: 'p', wuid: pr.wuid, secondary: true });
+    if (pr.burnDps > 0 && !e.dead) applyBurn(e, pr.burnDps, pr.burnTime || 2, pr.pid, pr.wuid);
+  }
+}
+
 function detonate(w, pr) {
   if (pr.boomed || !pr.boom) return;
   pr.boomed = true;
@@ -201,6 +215,7 @@ export function update(w, dt) {
       const dmg = pr.dmg * (pr.falloff ?? 1) ** (pr.nHit || 0);
       pr.nHit = (pr.nHit || 0) + 1;
       hitEnemy(w, e, dmg, { pid: pr.pid, crit: pr.crit, kb: pr.kb, kbAngle: Math.atan2(pr.vy, pr.vx), source: 'p', wuid: pr.wuid });
+      if (pr.burst && pr.nHit === 1) fireBurst(w, pr, e, dmg);
       if (pr.pierce-- <= 0) {
         if (pr.bnc > 0 && bounceOff(w, pr, e)) break; // flies on toward another enemy
         pr.dead = true;

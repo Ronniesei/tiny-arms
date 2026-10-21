@@ -48,6 +48,7 @@ Playing alone: click **Play solo**.
 
 ## Co-op
 - **Amber is shared:** everything anyone picks up goes into one pot, split evenly. No racing your mates for drops.
+- **Crates are shared out evenly:** a crate someone picks up goes to the player who has had the fewest so far, so the next one you grab may go to a mate. The crate icon by your portrait shows how many you hold this wave.
 - At 0 HP you're **down**, not dead. A mate standing next to you for 3 seconds revives you (Fern makes it much faster).
 - The run ends only when **everyone** is down at once.
 - Arrows at the screen edge point to mates who are off screen. They turn red when a mate is down.

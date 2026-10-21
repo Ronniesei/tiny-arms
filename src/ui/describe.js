@@ -106,6 +106,7 @@ export function weaponLines(wid, tier, stats = null) {
 
   const radius = tierVal(d.radius, t);
   if (radius > 0) add('Blast radius', fmt(radius));
+  if (d.burst) add('Fire burst', `${fmt(tierVal(d.burst.r, t))} px`, `others take ${Math.round(d.burst.frac * 100)}% and catch fire`);
   const bounces = tierVal(d.bounces, t);
   if (bounces > 0) add('Bounces', `${bounces}`);
   const fire = tierVal(d.fireDps, t);
