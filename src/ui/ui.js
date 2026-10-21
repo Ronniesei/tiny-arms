@@ -73,11 +73,25 @@ export class UI {
     else if (screen === 'end') data = JSON.stringify(s.me()?.result || s.world?.result || null);
     else if (screen === 'error') data = s.error;
     else if (screen === 'collection') data = this.collectionTab;
+    this.netWarning(screen === 'game' || screen === 'shop' ? !!s?.stalled : false);
     const key = `${screen}|${data}|${this.settingsOpen}`;
     if (key === this.key) return;
     this.screen = screen;
     this.key = key;
     this.render(screen);
+  }
+
+  /** A small banner while the host has gone quiet (client.js watchdog); kept outside the screen so re-renders keep it. */
+  netWarning(on) {
+    let el = document.getElementById('netwarn');
+    if (!on) { if (el) el.hidden = true; return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'netwarn';
+      el.textContent = 'Connection trouble: waiting for the host…';
+      document.body.appendChild(el);
+    }
+    el.hidden = false;
   }
 
   render(screen) {
@@ -88,7 +102,10 @@ export class UI {
     if (screen === 'menu') html = menuScreen(this);
     else if (screen === 'collection') html = collectionScreen(this);
     else if (screen === 'connecting') html = `<div class="center"><div class="panel small"><h2>Connecting…</h2><p>Finding the herd.</p><button data-act="menu">Cancel</button></div></div>`;
-    else if (screen === 'error') html = `<div class="center"><div class="panel small"><h2>Oops</h2><p>${esc(this.app.session.error || 'Something went wrong')}</p><button data-act="menu">Back to menu</button></div></div>`;
+    else if (screen === 'error') {
+      const s = this.app.session;
+      html = `<div class="center"><div class="panel small"><h2>${s.canRejoin ? 'Connection lost' : 'Oops'}</h2><p>${esc(s.error || 'Something went wrong')}</p><div class="row">${s.canRejoin ? '<button class="go" data-act="rejoin">Rejoin</button>' : ''}<button data-act="menu">Back to menu</button></div></div></div>`;
+    }
     else if (screen === 'lobby') html = lobbyScreen(this);
     else if (screen === 'shop') html = shopScreen(this);
     else if (screen === 'end') html = endScreen(this);
@@ -151,6 +168,7 @@ export class UI {
       start: (ui) => ui.app.session.startRun(),
       menu: (ui) => { ui.app.endSession(); ui.settingsOpen = false; ui.collectionTab = ''; history.replaceState(null, '', location.pathname); },
       again: (ui) => ui.app.session.playAgain(),
+      rejoin: (ui) => ui.app.join(ui.app.session.code), // the host gives a dropped mate their slot back
       closeSettings: (ui) => { ui.settingsOpen = false; },
     };
   }

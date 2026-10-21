@@ -154,7 +154,9 @@ export class Hud {
       this.showBanner('ENRAGED!', 'It pounces now: watch for the red circle', '#ff5a4a', 'red');
       this.alertDur = this.alertT = 1.4;
     } else if (ev.type === 'left') {
-      this.showBanner(`${ev.name} LEFT`, 'Their T-Rex leaves the herd in a few seconds', '#ffd23a');
+      this.showBanner(`${ev.name} LOST CONNECTION`, 'They can rejoin with the same invite link', '#ffd23a');
+    } else if (ev.type === 'back') {
+      this.showBanner(`${ev.name} IS BACK!`, 'Rejoined the herd', GREEN);
     } else if (ev.type === 'waveEnd') {
       this.showBanner('WAVE CLEARED!', 'On to the shop', GREEN);
     } else if (ev.type === 'phit' && ev.pid === myId) {

@@ -12,6 +12,9 @@ const INPUT_HZ = 30;
 const SNAP_CORRECT = 0.15;    // fraction of prediction error removed per snapshot
 const HARD_SNAP_PX = 40;
 
+const STALL_MS = 4000;   // no message from the host for this long: "connection trouble" banner
+const LOST_MS = 15000;   // ...for this long: give up and offer a rejoin (the host keeps the slot)
+
 /** Dash's Stampede moves the hero on the host: follow the host instead of predicting a walk (abState = casting flag). */
 const charging = (me) => me.char === 'dash' && me.casting;
 
@@ -55,7 +58,7 @@ export class ClientSession {
       this.conn.onData((m) => this.onMsg(m));
       this.conn.onClose(() => this.onHostLeft());
       this.conn.send({ t: 'hello', name: this.name, char: this.char, unlocks: this.unlocks });
-      this.pingTimer = setInterval(() => this.conn.send({ t: 'ping', c: performance.now() }), 2000);
+      this.pingTimer = setInterval(() => { this.conn.send({ t: 'ping', c: performance.now() }); this.watchdog(); }, 2000);
     } catch (e) {
       this.error = e.message;
       this.state = 'error';
@@ -64,15 +67,34 @@ export class ClientSession {
 
   onHostLeft() {
     if (this.state === 'error') return;
-    this.error = 'The host left the game.';
+    // Mid-run and the host did not say goodbye: our connection dropped, and the host keeps our slot for a rejoin.
+    this.canRejoin = this.inRun && !this.hostQuit;
+    this.error = this.canRejoin ? 'You lost the connection to the host. Your T-Rex is waiting: rejoin to carry on.' : 'The host left the game.';
     this.state = 'error';
     this.inRun = false;
+    this.stalled = false;
     clearInterval(this.pingTimer);
+  }
+
+  /**
+   * Nothing from the host for a while during a run (snapshots come ~20 times a second): show "connection trouble"
+   * after STALL_MS, and after LOST_MS stop pretending (a frozen shop or arena helps nobody) and offer a rejoin.
+   */
+  watchdog() {
+    if (!this.inRun || this.state === 'error') { this.stalled = false; return; }
+    const quiet = performance.now() - (this.lastHostMsg ?? performance.now());
+    this.stalled = quiet > STALL_MS;
+    if (quiet > LOST_MS) {
+      try { this.conn?.close(); } catch (e) { /* already closed */ }
+      this.onHostLeft();
+    }
   }
 
   now() { return performance.now() / 1000; }
 
   onMsg(m) {
+    this.lastHostMsg = performance.now();
+    this.stalled = false;
     switch (m.t) {
       case 'welcome': this.myId = m.id; this.state = 'lobby'; break;
       case 'full': this.error = m.msg; this.state = 'error'; break;
@@ -99,7 +121,7 @@ export class ClientSession {
         this.meData = null;
         this.ready = false;
         break;
-      case 'bye': this.onHostLeft(); break;
+      case 'bye': this.hostQuit = true; this.onHostLeft(); break;
       case 'snap': this.onSnap(m); break;
       case 'me': this.meData = m.d; if (m.res) this.lastRes = m.res; break;
       case 'pong': this.rtt = performance.now() - m.c; break;
@@ -168,6 +190,7 @@ export class ClientSession {
 
   update(dtMs) {
     if (!this.inRun) return;
+    this.watchdog();
     const dt = Math.min(dtMs, 100) / 1000;
     // Send input at INPUT_HZ, or right away when it changes.
     this.sendT -= dt;

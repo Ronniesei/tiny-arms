@@ -127,12 +127,17 @@ function headerHtml(me, v, now, danger = 1) {
   const nextTag = next?.boss ? '<em class="warn">Boss wave!</em>' : eliteTypeFor(me.wave + 1, danger) ? '<em class="warn">Elite wave!</em>' : '';
   const amberFlash = track.amberDelta && now - track.amberAt < FLASH_MS
     ? `<i class="adelta ${track.amberDelta > 0 ? 'good' : 'bad'}" style="animation-delay:-${Math.round(now - track.amberAt)}ms">${track.amberDelta > 0 ? '+' : ''}${track.amberDelta}</i>` : '';
+  const lost = (t) => t.gone || t.connected === false;
   const mates = me.team.map((t) => {
     const you = t.id === me.id;
-    return `<span class="mate ${t.ready ? 'ready' : ''} ${you ? 'you' : ''}" style="--pc:${PLAYER_COLORS_CSS[t.id % 4]}" data-tip-text="${esc(t.name)}${t.ready ? ' is ready' : ' is shopping'}">`
+    const tip = lost(t) ? ' lost connection. They can rejoin with the same invite link.' : t.ready ? ' is ready' : ' is shopping';
+    return `<span class="mate ${t.ready && !lost(t) ? 'ready' : ''} ${lost(t) ? 'lost' : ''} ${you ? 'you' : ''}" style="--pc:${PLAYER_COLORS_CSS[t.id % 4]}" data-tip-text="${esc(t.name)}${tip}">`
       + `<img src="${SPR(`h_${t.char}`)}" ${IMG_ERR} alt=""><b>${esc(t.name)}</b>`
-      + `<span class="tick">${t.ready ? ICON.check : '<i class="dots"></i>'}</span></span>`;
+      + `<span class="tick">${lost(t) ? '!' : t.ready ? ICON.check : '<i class="dots"></i>'}</span></span>`;
   }).join('');
+  // The last one still shopping gets a clear heads-up (the shop then closes within BALANCE.coop.lastReadyShopTime).
+  const playing = me.team.filter((t) => !lost(t));
+  const lastShopper = playing.length > 1 && !me.ready && playing.every((t) => t.id === me.id || t.ready);
   const readyLabel = me.ready ? `Ready ${ICON.check} Waiting for mates` : 'Ready for next wave';
   return `<header class="shophead">
     <div class="hl">
@@ -141,7 +146,7 @@ function headerHtml(me, v, now, danger = 1) {
     </div>
     <div class="amberbox"${tipAttr('amber')}>${AMBER}<b>${me.amber}</b>${amberFlash}</div>
     ${me.team.length > 1
-      ? `<div class="timer"><span>Next wave in <b data-shop-timer>${time}</b>s</span><i class="bar"><u style="animation-duration:${total}s;animation-delay:-${elapsed.toFixed(1)}s"></u></i></div>`
+      ? `<div class="timer ${lastShopper ? 'hurry' : ''}"><span>${lastShopper ? 'Your mates are ready! Next wave in' : 'Next wave in'} <b data-shop-timer>${time}</b>s</span><i class="bar"><u style="animation-duration:${total}s;animation-delay:-${elapsed.toFixed(1)}s"></u></i></div>`
       : '<div class="timer"><span>Take your time</span></div>'}
     <div class="team">${mates}</div>
     <button class="big go readybtn ${me.ready ? 'on' : ''}" data-act="shopready"${tipAttr('ready')}${crates ? ' data-tip-text="You still have loot crates. Going now opens them for you (you take the items)."' : levels ? ' data-tip-text="You still have a level-up to pick. It carries over if you go now."' : ''}><span>${readyLabel}</span><kbd>Space</kbd></button>

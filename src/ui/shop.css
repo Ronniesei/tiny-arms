@@ -44,6 +44,11 @@
 .mate .tick .svgi { width: 16px; height: 16px; vertical-align: 0; }
 .mate .dots { display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); box-shadow: -8px 0 0 var(--muted), 8px 0 0 var(--muted); opacity: .6; animation: blink 1.2s infinite; }
 @keyframes blink { 50% { opacity: .15; } }
+.mate.lost { opacity: .55; border-style: dashed; filter: grayscale(.7); }
+.mate.lost .tick { color: var(--bad); font-weight: 700; }
+.timer.hurry { color: var(--amber); font-weight: 600; }
+.timer.hurry b { color: var(--amber); animation: hurry 1s ease-in-out infinite; }
+@keyframes hurry { 50% { transform: scale(1.15); } }
 .readybtn { display: flex; align-items: center; gap: 10px; font-size: 24px; padding: 12px 24px; white-space: nowrap; }
 .readybtn kbd { font-size: 14px; opacity: .85; }
 .readybtn.on span { display: inline-flex; align-items: center; gap: 8px; }

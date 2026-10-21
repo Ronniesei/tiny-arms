@@ -179,7 +179,10 @@ export function privateView(w, pid) {
     crates: (p.crateOffers || []).map((o) => ({ ...o })),
     shop: p.shop ? { offers: p.shop.offers.map((o) => (o ? { ...o } : null)), rerolls: p.shop.rerolls, rerollCost: rerollCost(w, p), levelRerollCost: levelRerollCost(w, p) } : null,
     ready: p.ready,
-    team: w.players.filter((q) => !q.gone).map((q) => ({ id: q.id, name: q.name, char: q.char, ready: q.ready, level: q.level })),
+    // Mates who dropped out stay listed (gone) so everyone can see why they are missing; '-' are empty slots.
+    team: w.players.filter((q) => !(q.gone && q.name === '-')).map((q) => ({
+      id: q.id, name: q.name, char: q.char, ready: q.ready, level: q.level, gone: !!q.gone, connected: q.connected !== false,
+    })),
     result: w.result,
   };
 }

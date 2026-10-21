@@ -221,6 +221,32 @@ export function skipWave(w) {
   return [];
 }
 
+/**
+ * A player who dropped out comes back (host.js rejoin): same T-Rex, build and amber. Back mid-wave they stand up next to
+ * a mate with half HP and a moment of safety; back in the shop they get a fresh shop if theirs was skipped.
+ */
+export function restorePlayer(w, pid) {
+  const p = w.players[pid];
+  if (!p) return;
+  const wasGone = p.gone;
+  p.gone = false;
+  p.connected = true;
+  p.ready = false;
+  p.input = { mx: 0, my: 0, ab: p.input?.ab || 0, dr: p.input?.dr || 0 };
+  if (!wasGone) return; // back within the drop window: nothing was taken away
+  p.downed = false;
+  p.reviveT = 0;
+  if (w.phase === 'wave') {
+    const mate = w.players.find((q) => q.id !== pid && !q.gone && !q.downed);
+    if (mate) { p.x = mate.x + 50; p.y = mate.y; }
+    p.hp = Math.max(1, Math.round(p.stats.maxHp * 0.5));
+    p.iframes = Math.max(p.iframes || 0, 2);
+  } else if (w.phase === 'shop') {
+    p.hp = p.stats.maxHp;
+    openShop(w, p);
+  }
+}
+
 /** Mark a player as having left; they are removed from play. */
 export function removePlayer(w, pid) {
   const p = w.players[pid];

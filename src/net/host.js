@@ -7,7 +7,7 @@
 //   netStats(), error, leave()
 
 import { BALANCE } from '../data/balance.js';
-import { createWorld, step, skipWave, removePlayer } from '../sim/world.js';
+import { createWorld, step, skipWave, removePlayer, restorePlayer } from '../sim/world.js';
 import { applyShopOp } from '../sim/shop.js';
 import { encodeSnap, decodeSnap, privateView, filterEvents } from './protocol.js';
 import { createHostTransport } from './transport.js';
@@ -23,7 +23,9 @@ const DT = 1 / BALANCE.tickRate;
 const SNAP_EVERY = 3;         // ticks (20 Hz)
 const ME_EVERY = 30;          // ticks (2 Hz) for private state
 const DROP_AFTER_S = 4;
-const SILENT_AFTER_MS = 6000;  // no message (inputs at 30 Hz, pings every 2 s) for this long = gone
+// No message (inputs at 30 Hz, pings every 2 s) for this long = gone. Generous: a Wi-Fi hiccup must not drop a mate
+// (19 Oct: a mate was dropped mid-shop and the next wave started without him). A dropped mate can rejoin anyway.
+const SILENT_AFTER_MS = 20000;
 const MAX_PLAYERS = 4;
 
 export class HostSession {
@@ -53,6 +55,7 @@ export class HostSession {
     this.netEvents = [];
     this.lastPhase = null;
     this.dropTimers = new Map();
+    this.dropped = new Map();     // pid -> {name, char}: mates who lost their connection mid-run and may rejoin
     this.cachedView = null;
     this.cachedTick = -1;
     this.bytesOut = 0;
@@ -127,23 +130,59 @@ export class HostSession {
   }
 
   onJoin(conn) {
+    if (this.world) {
+      // A run is on: only a mate who dropped out of it can come back (same slot, same T-Rex and build).
+      const id = [...this.dropped.keys()].sort((a, b) => a - b)[0];
+      if (id === undefined) {
+        conn.send({ t: 'full', msg: 'That game has already started.' });
+        setTimeout(() => conn.close(), 500);
+        return;
+      }
+      this.rejoin(id, conn);
+      return;
+    }
     const taken = new Set(this.players.map((p) => p.id));
     let id = -1;
     for (let i = 0; i < MAX_PLAYERS; i++) if (!taken.has(i)) { id = i; break; }
-    if (this.world || id < 0) {
-      // Reconnect into a running game is not supported in v1.
-      conn.send({ t: 'full', msg: this.world ? 'That game has already started.' : 'That game is full (4 players).' });
+    if (id < 0) {
+      conn.send({ t: 'full', msg: 'That game is full (4 players).' });
       setTimeout(() => conn.close(), 500);
       return;
     }
-    this.conns.set(id, conn);
-    this.lastHeard.set(id, performance.now());
     this.players.push({ id, name: `Player ${id + 1}`, char: 'spike', ready: false, connected: true });
     this.players.sort((a, b) => a.id - b.id);
-    conn.onData((m) => this.onMsg(id, m));
-    conn.onClose(() => this.onLeave(id));
+    this.attach(id, conn);
     conn.send({ t: 'welcome', id, code: this.code });
     this.broadcastLobby();
+  }
+
+  /** Wire a connection to a player slot. Messages and closes from an older connection of the same slot are ignored. */
+  attach(id, conn) {
+    this.conns.set(id, conn);
+    this.lastHeard.set(id, performance.now());
+    conn.onData((m) => { if (this.conns.get(id) === conn) this.onMsg(id, m); });
+    conn.onClose(() => { if (this.conns.get(id) === conn) this.onLeave(id); });
+  }
+
+  /** A dropped mate is back: give them their slot, put their T-Rex back in play and bring their screen up to date. */
+  rejoin(id, conn) {
+    const info = this.dropped.get(id) || {};
+    this.dropped.delete(id);
+    this.dropTimers.delete(id);
+    let lp = this.players.find((p) => p.id === id);
+    if (!lp) {
+      lp = { id, name: info.name || `Player ${id + 1}`, char: info.char || 'spike', ready: false, connected: true };
+      this.players.push(lp);
+      this.players.sort((a, b) => a.id - b.id);
+    }
+    lp.connected = true;
+    restorePlayer(this.world, id);
+    this.attach(id, conn);
+    conn.send({ t: 'welcome', id, code: this.code, rejoin: true });
+    this.sendTo(conn, { t: 'start', seed: this.world.seed, danger: this.danger, rejoin: true, players: this.players.map((p) => ({ id: p.id, name: p.name, char: p.char })) });
+    this.sendMe(id);
+    this.broadcastLobby();
+    this.onEvents([{ type: 'back', pid: id, name: lp.name, k: this.world.tick }]);
   }
 
   onLeave(pid) {
@@ -157,6 +196,7 @@ export class HostSession {
     }
     const lp = this.players.find((p) => p.id === pid);
     if (lp) lp.connected = false;
+    if (lp) this.dropped.set(pid, { name: lp.name, char: lp.char });
     const wp = this.world.players[pid];
     if (wp) { wp.connected = false; wp.input = { mx: 0, my: 0, ab: wp.input.ab, dr: wp.input.dr || 0 }; }
     // Tell everyone (the renderer/HUD show a banner); events normally come from step(), so add it by hand.
@@ -169,7 +209,7 @@ export class HostSession {
     const lp = this.players.find((p) => p.id === pid);
     switch (m.t) {
       case 'hello':
-        if (lp) { lp.name = this.uniqueName(String(m.name || lp.name).slice(0, 16), pid); if (m.char) lp.char = m.char; }
+        if (lp) { lp.name = this.uniqueName(String(m.name || lp.name).slice(0, 16), pid); if (m.char && !this.world) lp.char = m.char; }
         if (lp && m.unlocks) this.unlocksBy.set(pid, normUnlocks(m.unlocks));
         this.broadcastLobby();
         break;
@@ -223,6 +263,7 @@ export class HostSession {
       list.push(lp ? { id: i, name: lp.name, char: lp.char } : { id: i, name: '-', char: 'spike', gone: true });
     }
     this.danger = Math.min(this.danger, this.teamMaxDanger()); // a mate who unlocked it may have left
+    this.dropped.clear();
     this.world = createWorld({ seed, players: list, startWave: this.startWave, danger: this.danger, pool: this.teamPool() });
     for (const p of list) if (p.gone) removePlayer(this.world, p.id);
     this.acc = 0;
@@ -234,6 +275,7 @@ export class HostSession {
 
   playAgain() {
     this.world = null;
+    this.dropped.clear();
     this.state = 'lobby';
     for (const p of this.players) p.ready = p.id === 0;
     this.players = this.players.filter((p) => p.connected);

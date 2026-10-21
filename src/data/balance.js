@@ -48,7 +48,7 @@ export const BALANCE = {
     // Herd spirit: each live mate within herdRadius gives +herdDamage damage and +herdArmor armor (max herdMax mates).
     herdRadius: 220, herdDamage: 0.08, herdArmor: 1, herdMax: 3,
     reviveHelpersMult: 2,     // two or more rescuers revive this much faster
-    lastReadyShopTime: 15,    // once everyone else is ready, the shop closes within this many seconds
+    lastReadyShopTime: 30,    // once everyone else is ready, the shop closes within this many seconds
   },
 
   enemy: {

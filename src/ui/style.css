@@ -49,3 +49,7 @@ input:focus { border-color: var(--amber); }
 [data-gloss] { cursor: help; }
 button[data-gloss], [data-act][data-gloss] { cursor: pointer; }
 #hudtips > div { position: fixed; z-index: 5; }
+
+#netwarn { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20; background: #5a1e16; color: var(--cream);
+  border: 3px solid var(--bad); border-radius: 14px; padding: 8px 18px; font-size: 18px; font-weight: 600; pointer-events: none; }
+#netwarn[hidden] { display: none; }
