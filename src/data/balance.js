@@ -75,6 +75,10 @@ export const BALANCE = {
   economy: {
     harvestGrowth: 0.05,    // Harvesting grows 5% (rounded up) each wave end
     xpPerAmber: 1,
+    eliteAmber: 65,         // an elite's amber (was 45; Ronnie 21 Oct: elites should pay a bit more)
+    bossAmber: 80,          // the boss's amber
+    // Elites and the boss also pay more in co-op (x the same factor as extra spawns, coop.spawnPerExtraPlayer), since
+    // there is still only one of them and the amber is split between everyone.
     dropStart: 0.9,         // chance a normal kill drops amber, waves 1-2
     dropPerWave: 0.018,     // falls this much per wave after wave 2
     dropMin: 0.55,

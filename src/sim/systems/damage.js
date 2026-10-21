@@ -135,8 +135,10 @@ function dropLoot(w, e, def, pid = -1) {
   let value = def.amber || 0;
   // Fractional amber is a chance at the extra 1 (0.4 = 40% chance of 1; 1.5 = 1, or 2 half the time).
   if (value % 1) value = Math.floor(value) + (chance(w.rng, value % 1) ? 1 : 0);
-  if (e.elite) value = 45;
-  if (e.boss) value = 60;
+  if (e.elite || e.boss) {
+    const coop = 1 + BALANCE.coop.spawnPerExtraPlayer * (Math.max(1, w.activeCount || 1) - 1);
+    value = Math.round((e.boss ? BALANCE.economy.bossAmber : BALANCE.economy.eliteAmber) * coop);
+  }
   if (value > 0 && (def.neutral || e.elite || e.boss || chance(w.rng, dropChance))) {
     if (w.bag > 0) { const extra = Math.min(w.bag, Math.ceil(value)); w.bag -= extra; value += extra; }
     const blobs = e.elite || e.boss ? 8 : 1;
