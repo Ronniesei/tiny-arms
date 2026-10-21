@@ -51,7 +51,7 @@ export function createPlayer(w, { id, name, char }) {
     critHealAcc: 0,     // Bloodthirst: HP healed from crits recently (drains over time, caps the heal rate)
     score: {
       kills: 0, damageDealt: 0, damageTaken: 0, revives: 0, healing: 0,
-      amber: 0, casts: 0, downs: 0, firstFallTick: -1, byWeapon: {},
+      amber: 0, picked: 0, casts: 0, downs: 0, firstFallTick: -1, byWeapon: {},
       rolls: 0, cleanWaves: 0, hurtThisWave: false, // for challenges (docs/PROGRESSION.md)
     },
   };

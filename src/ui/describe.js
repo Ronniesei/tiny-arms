@@ -101,7 +101,7 @@ export function weaponLines(wid, tier, stats = null) {
   const pierce = (d.pierce || 0) + (tierVal(d.pierceTier, t) || 0);
   if (pierce > 0) {
     const fall = Math.round((tierVal(d.pierceFalloff, t) ?? PIERCE_FALLOFF[i]) * 100);
-    add('Pierce', `${pierce} extra ${pierce === 1 ? 'enemy' : 'enemies'}`, `at ${fall}% damage`);
+    add('Pierce', `${pierce} extra ${pierce === 1 ? 'enemy' : 'enemies'}`, `each takes ${fall}% of the hit before`);
   }
 
   const radius = tierVal(d.radius, t);

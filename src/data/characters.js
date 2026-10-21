@@ -87,7 +87,7 @@ export const CHARACTERS = {
     weapon: 'spear_thrower',
     trait: {
       name: 'Spark',
-      desc: 'Your projectiles pierce 1 extra enemy. Meteor Call recharges 15% faster.',
+      desc: 'Your projectiles pierce 1 extra enemy (each one takes less than the last). Meteor Call recharges 15% faster.',
       extraPierce: 1, abilityCooldownMult: 0.85,
     },
     ability: {

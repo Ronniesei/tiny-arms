@@ -27,7 +27,7 @@ export const TITLES = [
   { id: 'medic', name: 'Medic', desc: 'Most revives and healing', cap: 'Kept the herd breathing.', stat: (s) => s.revives * 50 + s.healing },
   { id: 'tank', name: 'Tank', desc: 'Most damage taken', cap: 'Used their face as a shield.', stat: (s) => s.damageTaken },
   { id: 'slayer', name: 'Slayer', desc: 'Most kills', cap: 'Raptors whisper this name.', stat: (s) => s.kills },
-  { id: 'hoarder', name: 'Hoarder', desc: 'Most amber collected', cap: 'Pockets full of amber.', stat: (s) => s.amber },
+  { id: 'hoarder', name: 'Hoarder', desc: 'Picked up the most amber for the pot', cap: 'Pockets full of amber.', stat: (s) => s.picked ?? s.amber },
   { id: 'caster', name: 'Show-off', desc: 'Most abilities cast', cap: "Space bar's best friend.", stat: (s) => s.casts },
 ];
 

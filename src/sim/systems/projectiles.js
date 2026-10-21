@@ -196,8 +196,9 @@ export function update(w, dt) {
       if (kind?.onHit && kind.onHit(w, pr, e)) { if (pr.dead) break; continue; }
       if (pr.burnDps > 0) applyBurn(e, pr.burnDps, pr.burnTime || 2, pr.pid, pr.wuid);
       releaseTarget(pr);
-      // Piercing shots do reduced damage to every enemy after the first (better at higher tiers).
-      const dmg = pr.nHit ? pr.dmg * (pr.falloff ?? 1) : pr.dmg;
+      // Piercing shots lose damage with every enemy they pass through: each one takes `falloff` of the hit before
+      // (tier I 60%: 10, 6, 3.6...; higher tiers keep more). Ronnie, 21 Oct: Sparky's first spear killed three raptors.
+      const dmg = pr.dmg * (pr.falloff ?? 1) ** (pr.nHit || 0);
       pr.nHit = (pr.nHit || 0) + 1;
       hitEnemy(w, e, dmg, { pid: pr.pid, crit: pr.crit, kb: pr.kb, kbAngle: Math.atan2(pr.vy, pr.vx), source: 'p', wuid: pr.wuid });
       if (pr.pierce-- <= 0) {

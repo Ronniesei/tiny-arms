@@ -47,6 +47,7 @@ Playing alone: click **Play solo**.
 - Playing together, the run uses everyone's unlocks, and the host can pick the highest Danger anyone has opened.
 
 ## Co-op
+- **Amber is shared:** everything anyone picks up goes into one pot, split evenly. No racing your mates for drops.
 - At 0 HP you're **down**, not dead. A mate standing next to you for 3 seconds revives you (Fern makes it much faster).
 - The run ends only when **everyone** is down at once.
 - Arrows at the screen edge point to mates who are off screen. They turn red when a mate is down.

@@ -49,6 +49,7 @@ export const BALANCE = {
     herdRadius: 220, herdDamage: 0.08, herdArmor: 1, herdMax: 3,
     reviveHelpersMult: 2,     // two or more rescuers revive this much faster
     lastReadyShopTime: 30,    // once everyone else is ready, the shop closes within this many seconds
+    shareAmber: true,         // amber picked up goes into one pot split evenly between everyone (pickups.js shareAmber)
   },
 
   enemy: {

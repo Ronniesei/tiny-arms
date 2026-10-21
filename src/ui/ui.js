@@ -76,9 +76,10 @@ export class UI {
     this.netWarning(screen === 'game' || screen === 'shop' ? !!s?.stalled : false);
     const key = `${screen}|${data}|${this.settingsOpen}`;
     if (key === this.key) return;
+    const same = this.screen === screen;
     this.screen = screen;
     this.key = key;
-    this.render(screen);
+    this.render(screen, same);
   }
 
   /** A small banner while the host has gone quiet (client.js watchdog); kept outside the screen so re-renders keep it. */
@@ -94,7 +95,11 @@ export class UI {
     el.hidden = false;
   }
 
-  render(screen) {
+  render(screen, keepScroll = false) {
+    // A re-render of the same screen (a lock, a buy, a mate readying) replaces the scrolling panels: keep where the
+    // player had scrolled to (Ronnie, 21 Oct: locking an item jumped the shop back to the top).
+    const scrolls = keepScroll ? [...this.root.querySelectorAll('*')].filter((el) => el.scrollTop > 0 && el.classList.length)
+      .map((el) => [el.classList[0], el.scrollTop]) : [];
     const active = document.activeElement;
     const focusId = active && this.root.contains(active) ? active.id : null;
     const caret = focusId && active.selectionStart;
@@ -112,6 +117,10 @@ export class UI {
     if (this.settingsOpen) html += settingsModal(this);
     this.root.innerHTML = html;
     this.root.className = `screen-${screen}`;
+    for (const [cls, top] of scrolls) {
+      const el = this.root.querySelector(`.${CSS.escape(cls)}`);
+      if (el) el.scrollTop = top;
+    }
     if (focusId) {
       const el = document.getElementById(focusId);
       if (el) { el.focus(); if (caret != null && el.setSelectionRange) el.setSelectionRange(caret, caret); }

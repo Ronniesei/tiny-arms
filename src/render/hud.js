@@ -254,6 +254,9 @@ export class Hud {
     // Amber, level, XP.
     this.amberPop = Math.max(0, this.amberPop - dt * 3.5);
     this.amberIcon.setPosition(180, 138).setScale(this.amberIcon.scaleX > 0 ? 36 / this.amberIcon.width * (1 + 0.3 * this.amberPop) : 1);
+    // Pop whenever amber goes up: your own pickups and your share of your mates' (co-op pot).
+    if (this.lastAmber !== undefined && p.amber > this.lastAmber) this.amberPop = 1;
+    this.lastAmber = p.amber;
     put(this.amberText, `${p.amber}`).setScale(1 + 0.25 * this.amberPop);
     put(this.levelText, `LV ${p.level}`);
     const xpK = me && me.xpNext ? clamp01(me.xp / me.xpNext) : 0;

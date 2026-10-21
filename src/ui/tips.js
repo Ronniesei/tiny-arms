@@ -39,7 +39,7 @@ export const GLOSSARY = {
   w_range: { t: 'Range', d: 'How far the weapon can reach to shoot an enemy (in pixels).' },
   w_reach: { t: 'Reach', d: 'How far the melee swing reaches from your T-Rex (in pixels).' },
   w_crit: { t: 'Crit', d: 'This weapon\'s chance to crit (including your Crit Chance) and how much a crit multiplies the hit.' },
-  w_pierce: { t: 'Pierce', d: 'The shot passes through this many extra enemies. Each extra enemy takes reduced damage; higher tiers reduce it less.' },
+  w_pierce: { t: 'Pierce', d: 'The shot passes through this many extra enemies. Each one takes less than the one before (a share of the previous hit); higher tiers keep more.' },
   w_blast: { t: 'Blast radius', d: 'Size of the explosion; every enemy inside takes the damage.' },
   w_bounces: { t: 'Bounces', d: 'How many times the shot bounces off the arena walls before it explodes.' },
   w_fire: { t: 'Burning ground', d: 'Leaves a patch of fire that hurts enemies standing in it every second. Ability Power makes it stronger.' },
@@ -48,7 +48,7 @@ export const GLOSSARY = {
   w_knockback: { t: 'Knockback', d: 'How hard hits shove enemies away from you.' },
 
   // ---- Shop and run terms ----
-  amber: { t: 'Amber', d: 'Your money and your XP in one: dead enemies drop it, you walk over it to collect. Spend it in the shop between waves. Amber you miss is not lost: it comes back as bonus drops next wave.' },
+  amber: { t: 'Amber', d: 'Your money and your XP in one: dead enemies drop it, you walk over it to collect. Spend it in the shop between waves. Amber you miss is not lost: it comes back as bonus drops next wave. In co-op all amber goes into one pot, split evenly between the team.' },
   xp: { t: 'Level', d: 'Collecting amber also gives XP. Each level gives +1 Max HP and a stat card to pick in the shop.' },
   reroll: { t: 'Reroll', d: 'Swap the unlocked offers for new ones. It costs more each time you press it, and the price resets every wave.' },
   lock: { t: 'Lock', d: 'Keeps this offer when you reroll and into the next shop, at today\'s price. Locking is free.' },

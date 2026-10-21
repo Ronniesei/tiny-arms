@@ -74,10 +74,31 @@ export function payHarvest(w, p) {
   return h;
 }
 
+/**
+ * Co-op amber is one pot split evenly (Ronnie, 21 Oct, as in Brotato): every pickup is divided between everyone still
+ * in the run (downed mates too), so nobody races mates for drops. 30 + 10 picked up by two players = 20 each.
+ * Fractions carry over per player. Each player's own bonuses (Goldie, Ancient Amber) and XP apply to their share.
+ * Solo, or with BALANCE.coop.shareAmber off: the picker gets it all.
+ */
+export function shareAmber(w, p, pk) {
+  const team = BALANCE.coop.shareAmber ? w.players.filter((q) => !q.gone) : [p];
+  if (!team.includes(p)) team.push(p);
+  const each = pk.v / team.length;
+  for (const q of team) {
+    q.shareAcc = (q.shareAcc || 0) + each;
+    const whole = Math.floor(q.shareAcc + 1e-9);
+    q.shareAcc -= whole;
+    if (whole > 0) awardAmber(w, q, whole, pk.x, pk.y, { quiet: true });
+  }
+  // One event for the pickup itself (spark and sound for the picker); the HUD pops everyone's amber as it rises.
+  emit(w, { type: 'pickup', pid: p.id, kind: 'amber', v: pk.v, x: Math.round(pk.x), y: Math.round(pk.y) });
+}
+
 export function collect(w, p, pk) {
   pk.dead = true;
   if (pk.kind === 'amber') {
-    awardAmber(w, p, pk.v, pk.x, pk.y);
+    p.score.picked = (p.score.picked || 0) + pk.v; // the Hoarder title: who picked up the most
+    shareAmber(w, p, pk);
     if (p.specials?.vacuum > 0) grantXp(w, p, SPECIAL_RULES.vacuumXp * p.specials.vacuum); // Amber Vacuum
   } else if (pk.kind === 'crate') {
     storeCrate(w, p, pk);
