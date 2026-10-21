@@ -92,7 +92,8 @@ export class App {
   }
 
   tick(now, fromFrame = false) {
-    const dt = Math.min(250, now - this.last);
+    // Up to 1 s: a hidden tab may only tick about once a second, and the host must keep real time for its mates.
+    const dt = Math.min(1000, now - this.last);
     if (dt <= 0) return;
     this.last = now;
     if (fromFrame && dt >= 4) this.fpsVal = this.fpsVal * 0.95 + (1000 / dt) * 0.05;
@@ -100,8 +101,9 @@ export class App {
     if (s) {
       try {
         s.setInput(this.readInput(s));
-        // Solo runs pause while the settings panel is open (co-op can't pause for everyone).
-        if (!(s.solo && this.ui?.settingsOpen)) s.update(dt);
+        // Solo runs pause while the settings panel is open or the tab is hidden (alt-tab); co-op can't pause for everyone.
+        const hidden = typeof document !== 'undefined' && document.hidden;
+        if (!(s.solo && (this.ui?.settingsOpen || hidden))) s.update(dt);
         if (this.bot) this.botShop(s, dt);
         this.trackRun(s);
       } catch (e) {

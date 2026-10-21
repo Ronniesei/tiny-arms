@@ -23,6 +23,9 @@ const DT = 1 / BALANCE.tickRate;
 const SNAP_EVERY = 3;         // ticks (20 Hz)
 const ME_EVERY = 30;          // ticks (2 Hz) for private state
 const DROP_AFTER_S = 4;
+const KEEPALIVE_MS = 4000;
+const SNAP_BACKLOG = 256 * 1024; // bytes queued to a mate before snapshots to them are skipped     // signalling heartbeat / reconnect check (transport.keepAlive)
+const HELLO_WAIT_MS = 3000;    // a mate connecting mid-run: wait this long for their hello (it says who they were)
 // No message (inputs at 30 Hz, pings every 2 s) for this long = gone. Generous: a Wi-Fi hiccup must not drop a mate
 // (19 Oct: a mate was dropped mid-shop and the next wave started without him). A dropped mate can rejoin anyway.
 const SILENT_AFTER_MS = 20000;
@@ -131,14 +134,12 @@ export class HostSession {
 
   onJoin(conn) {
     if (this.world) {
-      // A run is on: only a mate who dropped out of it can come back (same slot, same T-Rex and build).
-      const id = [...this.dropped.keys()].sort((a, b) => a - b)[0];
-      if (id === undefined) {
-        conn.send({ t: 'full', msg: 'That game has already started.' });
-        setTimeout(() => conn.close(), 500);
-        return;
-      }
-      this.rejoin(id, conn);
+      // A run is on: only a mate who dropped out of it can come back. Their hello says which slot was theirs.
+      const pend = { done: false };
+      const place = (m) => { if (!pend.done) { pend.done = true; this.placeReturning(conn, m || {}); } };
+      conn.onData((m) => { if (m && m.t === 'hello') place(m); });
+      conn.onClose(() => { pend.done = true; });
+      setTimeout(() => place({}), HELLO_WAIT_MS);
       return;
     }
     const taken = new Set(this.players.map((p) => p.id));
@@ -162,6 +163,33 @@ export class HostSession {
     this.lastHeard.set(id, performance.now());
     conn.onData((m) => { if (this.conns.get(id) === conn) this.onMsg(id, m); });
     conn.onClose(() => { if (this.conns.get(id) === conn) this.onLeave(id); });
+  }
+
+  /**
+   * Someone connected mid-run. They get their slot back if it was theirs: the slot in their hello (rejoinId) when we
+   * already dropped it, or when our side still thinks their old connection is up (a half-dead link that never closed;
+   * same name required). Otherwise the first dropped slot, else "already started".
+   */
+  placeReturning(conn, hello) {
+    // Who are they? Their old slot number (kept by their browser, even across a reload), else the same name.
+    const sameName = (p) => p && (p.name === hello.name || (hello.rejoinName && p.name === hello.rejoinName));
+    const byName = this.players.find((p) => p.id > 0 && sameName(p));
+    const want = Number.isInteger(hello.rejoinId) && hello.rejoinId > 0 ? hello.rejoinId : byName ? byName.id : -1;
+    const lp = this.players.find((p) => p.id === want);
+    let id = -1;
+    if (want > 0 && this.dropped.has(want)) id = want;
+    else if (want > 0 && this.conns.has(want) && sameName(lp) && !this.world.players[want]?.gone) {
+      const old = this.conns.get(want);
+      this.onLeave(want);
+      try { old.close(); } catch (e) { /* already dead */ }
+      id = want;
+    } else id = [...this.dropped.keys()].sort((a, b) => a - b)[0] ?? -1;
+    if (id < 0) {
+      conn.send({ t: 'full', msg: 'That game has already started.' });
+      setTimeout(() => conn.close(), 500);
+      return;
+    }
+    this.rejoin(id, conn);
   }
 
   /** A dropped mate is back: give them their slot, put their T-Rex back in play and bring their screen up to date. */
@@ -320,6 +348,11 @@ export class HostSession {
   update(dtMs) {
     this.silentT = (this.silentT || 0) + dtMs;
     if (this.silentT > 1000) { this.silentT = 0; this.checkSilent(); }
+    // Keep the room registered with the signalling server even when the browser throttles this (hidden) tab's timers,
+    // or mates could not rejoin (Ronnie alt-tabbed on 21 Oct and Nick could not get back in). This loop keeps running
+    // in a hidden tab (app.js worker tick).
+    const now = performance.now();
+    if (now - (this.keepAliveAt || 0) > KEEPALIVE_MS) { this.keepAliveAt = now; this.transport?.keepAlive?.(); }
     const w = this.world;
     if (!w) return;
     for (const [pid, t] of this.dropTimers) {
@@ -327,9 +360,10 @@ export class HostSession {
       if (left <= 0) { this.dropTimers.delete(pid); removePlayer(w, pid); this.players = this.players.filter((p) => p.id !== pid); }
       else this.dropTimers.set(pid, left);
     }
-    this.acc += (Math.min(dtMs, 250) / 1000) * this.speed;
+    // A hidden tab may only get a tick every second or so: catch up (up to 1 s) instead of slowing the game for everyone.
+    this.acc = Math.min(1, this.acc + (Math.min(dtMs, 1000) / 1000) * this.speed);
     let steps = 0;
-    const maxSteps = 6 * Math.max(1, this.speed);
+    const maxSteps = 62 * Math.max(1, this.speed);
     while (this.acc >= DT && steps < maxSteps) {
       this.acc -= DT;
       steps++;
@@ -362,7 +396,9 @@ export class HostSession {
     const snap = encodeSnap(this.world);
     snap.ev = filterEvents(this.netEvents);
     this.netEvents = [];
-    this.broadcast(snap);
+    // A mate on a slow line: skip snapshots while their send queue is backed up (each snapshot replaces the last, so
+    // queueing old ones only adds lag). Their events are lost, which is fine (sounds and effects).
+    for (const conn of this.conns.values()) if ((conn.bufferedAmount || 0) < SNAP_BACKLOG) this.sendTo(conn, snap);
   }
 
   view() {

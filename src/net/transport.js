@@ -5,11 +5,24 @@
 const PREFIX = 'trex-';
 const CONNECT_TIMEOUT_MS = 15000;
 
+// Messages go as plain JSON text over a 'raw' channel (joiners ask for it in connectToHost). PeerJS's own 'json' mode
+// refuses any message over ~16 KB ("Message too big for JSON channel"), and late-wave snapshots get that big: that
+// error used to count as a disconnect and kicked mates mid-game (21 Oct). Old pages still on 'json' keep working.
 function wrapPeerConn(c) {
+  const raw = c.serialization === 'raw';
   const conn = {
-    send: (m) => { if (c.open) c.send(m); },
-    onData: (cb) => c.on('data', cb),
-    onClose: (cb) => { c.on('close', cb); c.on('error', cb); },
+    send: (m) => { if (c.open) c.send(raw ? JSON.stringify(m) : m); },
+    onData: (cb) => c.on('data', (d) => {
+      if (!raw) { cb(d); return; }
+      let m;
+      try { m = JSON.parse(d); } catch (e) { return; }
+      cb(m);
+    }),
+    // Only a closed channel ends the link. PeerJS also emits 'error' for a single failed send.
+    onClose: (cb) => {
+      c.on('close', cb);
+      c.on('error', (e) => { console.warn('connection error', e?.type || e); if (!c.open) cb(); });
+    },
     close: () => c.close(),
     get bufferedAmount() { return c.dataChannel?.bufferedAmount || 0; },
   };
@@ -30,7 +43,7 @@ export function createHostTransport(code, { local = false } = {}) {
     let opened = false;
     peer.on('open', () => {
       opened = true;
-      resolve({ onJoin: (cb) => { joinCb = cb; }, close: () => peer.destroy(), peer });
+      resolve({ onJoin: (cb) => { joinCb = cb; }, close: () => peer.destroy(), peer, keepAlive: () => keepAlive(peer) });
     });
     peer.on('connection', (c) => {
       c.on('open', () => joinCb(wrapPeerConn(c)));
@@ -43,6 +56,21 @@ export function createHostTransport(code, { local = false } = {}) {
   });
 }
 
+/**
+ * The host's room only exists while its peer is registered with the PeerJS signalling server. PeerJS sends its
+ * heartbeat from a main-thread timer, which browsers throttle hard in hidden tabs, so the server can drop the room
+ * while the host is alt-tabbed and nobody can rejoin. The host calls this from its game loop (which keeps running in a
+ * hidden tab): reconnect if dropped, else send a heartbeat ourselves.
+ */
+function keepAlive(peer) {
+  try {
+    if (peer.destroyed) return;
+    if (peer.disconnected) { peer.reconnect(); return; }
+    const ws = peer.socket && peer.socket._socket;
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'HEARTBEAT' }));
+  } catch (e) { /* best effort */ }
+}
+
 /** Join a room. @returns {Promise<conn>} */
 export function connectToHost(code, { local = false } = {}) {
   if (local) return connectLocal(code);
@@ -52,7 +80,7 @@ export function connectToHost(code, { local = false } = {}) {
     const peer = new Peer({ debug: 1 });
     const timer = setTimeout(() => { peer.destroy(); reject(new Error('Could not reach the host. Check the code, or the host may be behind a strict firewall.')); }, CONNECT_TIMEOUT_MS);
     peer.on('open', () => {
-      const c = peer.connect(PREFIX + code.toLowerCase(), { reliable: true, serialization: 'json' });
+      const c = peer.connect(PREFIX + code.toLowerCase(), { reliable: true, serialization: 'raw' });
       c.on('open', () => { clearTimeout(timer); const conn = wrapPeerConn(c); conn.peer = peer; resolve(conn); });
       c.on('error', (e) => { clearTimeout(timer); reject(new Error(`Connection failed (${e.type || e.message})`)); });
     });

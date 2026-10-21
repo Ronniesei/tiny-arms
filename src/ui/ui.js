@@ -47,6 +47,7 @@ export class UI {
     const ph = s.phase();
     if (ph === 'connecting') return 'connecting';
     if (ph === 'error') return 'error';
+    if (ph === 'reconnecting') return 'reconnecting';
     if (ph === 'lobby') return 'lobby';
     if (ph === 'wave') return 'game';
     if (ph === 'shop') return 'shop';
@@ -72,6 +73,7 @@ export class UI {
     }
     else if (screen === 'end') data = JSON.stringify(s.me()?.result || s.world?.result || null);
     else if (screen === 'error') data = s.error;
+    else if (screen === 'reconnecting') data = String(s.reconnectTry || 0);
     else if (screen === 'collection') data = this.collectionTab;
     this.netWarning(screen === 'game' || screen === 'shop' ? !!s?.stalled : false);
     const key = `${screen}|${data}|${this.settingsOpen}`;
@@ -89,7 +91,7 @@ export class UI {
     if (!el) {
       el = document.createElement('div');
       el.id = 'netwarn';
-      el.textContent = 'Connection trouble: waiting for the host…';
+      el.textContent = 'Waiting for the host… (their game may be minimised or their connection slow)';
       document.body.appendChild(el);
     }
     el.hidden = false;
@@ -107,7 +109,10 @@ export class UI {
     if (screen === 'menu') html = menuScreen(this);
     else if (screen === 'collection') html = collectionScreen(this);
     else if (screen === 'connecting') html = `<div class="center"><div class="panel small"><h2>Connecting…</h2><p>Finding the herd.</p><button data-act="menu">Cancel</button></div></div>`;
-    else if (screen === 'error') {
+    else if (screen === 'reconnecting') {
+      const n = this.app.session.reconnectTry || 1;
+      html = `<div class="center"><div class="panel small"><h2>Reconnecting…</h2><p>Lost the connection to the host. Getting you back into the same run, with the same T-Rex.</p><p class="muted">Try ${n}. The host's game keeps going meanwhile.</p><button data-act="menu">Leave game</button></div></div>`;
+    } else if (screen === 'error') {
       const s = this.app.session;
       html = `<div class="center"><div class="panel small"><h2>${s.canRejoin ? 'Connection lost' : 'Oops'}</h2><p>${esc(s.error || 'Something went wrong')}</p><div class="row">${s.canRejoin ? '<button class="go" data-act="rejoin">Rejoin</button>' : ''}<button data-act="menu">Back to menu</button></div></div></div>`;
     }
@@ -177,7 +182,7 @@ export class UI {
       start: (ui) => ui.app.session.startRun(),
       menu: (ui) => { ui.app.endSession(); ui.settingsOpen = false; ui.collectionTab = ''; history.replaceState(null, '', location.pathname); },
       again: (ui) => ui.app.session.playAgain(),
-      rejoin: (ui) => ui.app.join(ui.app.session.code), // the host gives a dropped mate their slot back
+      rejoin: (ui) => ui.app.session.reconnect(), // the host gives a dropped mate their slot back (client.js)
       closeSettings: (ui) => { ui.settingsOpen = false; },
     };
   }

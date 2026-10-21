@@ -12,8 +12,23 @@ const INPUT_HZ = 30;
 const SNAP_CORRECT = 0.15;    // fraction of prediction error removed per snapshot
 const HARD_SNAP_PX = 40;
 
-const STALL_MS = 4000;   // no message from the host for this long: "connection trouble" banner
-const LOST_MS = 15000;   // ...for this long: give up and offer a rejoin (the host keeps the slot)
+const STALL_MS = 4000;   // no message from the host for this long: "waiting for the host" banner
+const LOST_MS = 30000;   // ...for this long: assume the link is dead and reconnect (the host keeps the slot)
+const RECONNECT_EVERY_MS = 3000;
+const RECONNECT_FOR_MS = 180000;
+
+/** This browser's slot in a room, so a reload (or a crashed tab) can rejoin as the same T-Rex. Storage may be missing. */
+const SLOT_KEY = 'tinyarms.slot';
+function rememberSlot(code, id, name) {
+  try { globalThis.localStorage?.setItem(SLOT_KEY, JSON.stringify({ code: String(code).toUpperCase(), id, name, at: Date.now() })); } catch (e) { /* private mode */ }
+}
+/** {id, name} this browser had in that room (a few hours back at most), or null. */
+function recallSlot(code) {
+  try {
+    const s = JSON.parse(globalThis.localStorage?.getItem(SLOT_KEY) || 'null');
+    return s && s.code === String(code).toUpperCase() && Date.now() - s.at < 6 * 3600e3 ? s : null;
+  } catch (e) { return null; }
+}
 
 /** Dash's Stampede moves the hero on the host: follow the host instead of predicting a walk (abState = casting flag). */
 const charging = (me) => me.char === 'dash' && me.casting;
@@ -54,21 +69,67 @@ export class ClientSession {
 
   async open() {
     try {
-      this.conn = await connectToHost(this.code, { local: this.local });
-      this.conn.onData((m) => this.onMsg(m));
-      this.conn.onClose(() => this.onHostLeft());
-      this.conn.send({ t: 'hello', name: this.name, char: this.char, unlocks: this.unlocks });
-      this.pingTimer = setInterval(() => { this.conn.send({ t: 'ping', c: performance.now() }); this.watchdog(); }, 2000);
+      await this.connect();
+      this.pingTimer = setInterval(() => { this.conn?.send({ t: 'ping', c: performance.now() }); this.watchdog(); }, 2000);
     } catch (e) {
       this.error = e.message;
       this.state = 'error';
     }
   }
 
+  /** Open (or re-open) the connection and say hello. Messages from an older connection are ignored. */
+  async connect() {
+    const conn = await connectToHost(this.code, { local: this.local });
+    if (this.left) { try { conn.close(); conn.peer?.destroy(); } catch (e) { /* gone */ } return; }
+    this.conn = conn;
+    conn.onData((m) => { if (this.conn === conn) this.onMsg(m); });
+    conn.onClose(() => { if (this.conn === conn) this.onHostLeft(); });
+    // rejoinId: mid-run, the host gives a returning mate their own slot back (host.js placeReturning). After a reload
+    // this browser still remembers the slot it had in this room (rememberSlot).
+    const mem = this.myId > 0 ? { id: this.myId, name: this.hostName } : recallSlot(this.code);
+    conn.send({
+      t: 'hello', name: this.name, char: this.char, unlocks: this.unlocks,
+      rejoinId: mem && mem.id > 0 ? mem.id : undefined, rejoinName: mem?.name || undefined,
+    });
+  }
+
+  /**
+   * Lost the host mid-run: try to get back in on our own, every few seconds for a couple of minutes (the host may be
+   * alt-tabbed or on a flaky line). The host keeps our T-Rex, so we land back in the same run. Also the Rejoin button.
+   */
+  async reconnect() {
+    if (this.reconnecting || this.left) return;
+    this.reconnecting = true;
+    this.reconnectTry = 0;
+    this.state = 'reconnecting';
+    this.stalled = false;
+    const old = this.conn;
+    this.conn = null;
+    try { old?.close(); old?.peer?.destroy(); } catch (e) { /* already closed */ }
+    const started = performance.now();
+    while (!this.left && performance.now() - started < RECONNECT_FOR_MS) {
+      this.reconnectTry++;
+      try {
+        this.lastHostMsg = performance.now();
+        await this.connect();
+        // Connected: the host answers with welcome + start + snapshots, which bring the screen back.
+        this.reconnecting = false;
+        return;
+      } catch (e) { /* not reachable yet */ }
+      await new Promise((r) => setTimeout(r, this.retryMs ?? RECONNECT_EVERY_MS));
+    }
+    this.reconnecting = false;
+    if (this.left) return;
+    this.canRejoin = true;
+    this.error = 'Could not reach the host. If they are still playing, try Rejoin.';
+    this.state = 'error';
+  }
+
   onHostLeft() {
-    if (this.state === 'error') return;
-    // Mid-run and the host did not say goodbye: our connection dropped, and the host keeps our slot for a rejoin.
-    this.canRejoin = this.inRun && !this.hostQuit;
+    if (this.state === 'error' || this.left) return;
+    // Mid-run and the host did not say goodbye: our connection dropped and the host keeps our slot. Reconnect.
+    if (this.inRun && !this.hostQuit) { this.reconnect(); return; }
+    this.canRejoin = false;
     this.error = this.canRejoin ? 'You lost the connection to the host. Your T-Rex is waiting: rejoin to carry on.' : 'The host left the game.';
     this.state = 'error';
     this.inRun = false;
@@ -81,25 +142,29 @@ export class ClientSession {
    * after STALL_MS, and after LOST_MS stop pretending (a frozen shop or arena helps nobody) and offer a rejoin.
    */
   watchdog() {
-    if (!this.inRun || this.state === 'error') { this.stalled = false; return; }
-    const quiet = performance.now() - (this.lastHostMsg ?? performance.now());
-    this.stalled = quiet > STALL_MS;
-    if (quiet > LOST_MS) {
-      try { this.conn?.close(); } catch (e) { /* already closed */ }
-      this.onHostLeft();
-    }
+    if (!this.inRun || this.reconnecting || this.state === 'error') { this.stalled = false; return; }
+    const now = performance.now();
+    // The game is stuck when snapshots stop (a host tab the browser has throttled still answers pings)...
+    this.stalled = now - (this.lastSnapAt ?? this.lastHostMsg ?? now) > STALL_MS;
+    // ...but the link is only dead when nothing at all comes back.
+    const quiet = now - (this.lastHostMsg ?? now);
+    // Silent for this long: the link is probably dead without having closed. Reconnecting is harmless if the host is
+    // only slow (it swaps us onto the new connection).
+    if (quiet > LOST_MS) this.reconnect();
   }
 
   now() { return performance.now() / 1000; }
 
   onMsg(m) {
     this.lastHostMsg = performance.now();
-    this.stalled = false;
     switch (m.t) {
-      case 'welcome': this.myId = m.id; this.state = 'lobby'; break;
-      case 'full': this.error = m.msg; this.state = 'error'; break;
+      case 'welcome': this.myId = m.id; rememberSlot(this.code, m.id, this.hostName); if (!m.rejoin) this.state = 'lobby'; break;
+      case 'full': this.error = m.msg; this.canRejoin = false; this.inRun = false; this.state = 'error'; break;
       case 'lobby':
         this.players = m.players;
+        // The name the host knows us by (it may add "2" to a duplicate): remembered for a rejoin after a reload.
+        this.hostName = m.players?.find((p) => p.id === this.myId)?.name || this.hostName;
+        if (this.myId > 0 && this.hostName) rememberSlot(this.code, this.myId, this.hostName);
         if (m.danger !== undefined) this.danger = clampDanger(m.danger);
         if (m.maxDanger !== undefined) this.maxDanger = clampDanger(m.maxDanger);
         if (!this.inRun) this.state = 'lobby';
@@ -130,6 +195,7 @@ export class ClientSession {
   }
 
   onSnap(m) {
+    this.lastSnapAt = performance.now();
     const now = this.now();
     this.bytesWindow.push([performance.now(), JSON.stringify(m).length]);
     const view = decodeSnap(m, this.names);
@@ -177,7 +243,11 @@ export class ClientSession {
   setDanger() {}   // only the host chooses
   startRun() {}
   playAgain() {}
-  leave() { clearInterval(this.pingTimer); this.conn?.close(); }
+  leave() {
+    this.left = true;
+    clearInterval(this.pingTimer);
+    try { this.conn?.close(); this.conn?.peer?.destroy(); } catch (e) { /* already closed */ }
+  }
 
   setInput(inp) { this.input = inp; }
 
